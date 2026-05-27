@@ -18,7 +18,12 @@ export default function LoginPage() {
     setLoading(true)
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: false },  // Interdit la création de compte
+      options: {
+        shouldCreateUser: false,  // Interdit la création de compte
+        // Le magic link dans l'email redirige vers l'origine actuelle.
+        // En dev → localhost:5173, en prod → domaine Vercel.
+        emailRedirectTo: window.location.origin,
+      },
     })
     setLoading(false)
     if (error) {
