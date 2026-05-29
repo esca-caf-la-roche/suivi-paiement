@@ -13,7 +13,7 @@ const STATUS_OPTIONS: Array<{ value: PaymentStatusEnum; label: string }> = [
 ]
 
 // Statuts nécessitant un commentaire avant confirmation
-const NEEDS_COMMENT = new Set<PaymentStatusEnum>(['Remboursé', 'Problème'])
+const NEEDS_COMMENT = new Set<PaymentStatusEnum>(['En attente', 'Remboursé', 'Problème'])
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
