@@ -112,6 +112,11 @@ export function useDossiers(): UseDossiersReturn {
           ? link.parent_link_id
           : link.id
 
+        // Filtre : n'afficher que les dossiers du lien assigné à l'utilisateur courant
+        // (si responsible_id est null → visible par tous)
+        const principalLink = linksMap.get(principalLinkId)
+        if (principalLink?.responsible_id && principalLink.responsible_id !== user?.id) continue
+
         // Groupes associés à ce dossier
         const dossierGroups = groups.filter(g => g.link_id === principalLinkId)
 

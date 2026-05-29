@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Hook : useHelloassoLinks
-//
-// CRUD complet sur la table `helloasso_links`.
-// Utilise le client Supabase avec la session courante (RLS appliqué).
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { HelloassoLink } from '../types/database'
@@ -14,13 +7,14 @@ export interface NewHelloassoLink {
   label:          string
   is_installment: boolean
   parent_link_id: string | null
+  responsible_id: string | null
 }
 
 export interface UseHelloassoLinksReturn {
   links:      HelloassoLink[]
   loading:    boolean
   error:      string | null
-  addLink:    (data: NewHelloassoLink, responsibleId: string) => Promise<void>
+  addLink:    (data: NewHelloassoLink) => Promise<void>
   updateLink: (id: string, data: Partial<NewHelloassoLink>) => Promise<void>
   deleteLink: (id: string) => Promise<void>
   refresh:    () => void
@@ -56,12 +50,15 @@ export function useHelloassoLinks(): UseHelloassoLinksReturn {
     return () => { cancelled = true }
   }, [tick])
 
-  const addLink = useCallback(async (data: NewHelloassoLink, responsibleId: string) => {
+  const addLink = useCallback(async (data: NewHelloassoLink) => {
     const { error } = await supabase
       .from('helloasso_links')
       .insert({
-        ...data,
-        responsible_id: responsibleId,
+        url:            data.url,
+        label:          data.label,
+        is_installment: data.is_installment,
+        parent_link_id: data.parent_link_id,
+        responsible_id: data.responsible_id || null,
       })
     if (error) throw new Error(error.message)
     refresh()
