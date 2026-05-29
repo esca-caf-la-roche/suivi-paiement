@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useDossiers } from '../hooks/useDossiers'
 import { useSyncHelloasso } from '../hooks/useSyncHelloasso'
 import type { Dossier, PaymentStatusEnum, Responsible } from '../types/database'
@@ -11,6 +11,9 @@ const STATUS_OPTIONS: Array<{ value: PaymentStatusEnum; label: string }> = [
   { value: 'Remboursé',  label: 'Remboursé'  },
   { value: 'Problème',   label: 'Problème'   },
 ]
+
+// Statuts nécessitant un commentaire avant confirmation
+const NEEDS_COMMENT = new Set<PaymentStatusEnum>(['Remboursé', 'Problème'])
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,7 +60,7 @@ function StatsBar({ dossiers }: { dossiers: Dossier[] }) {
   ]
 
   return (
-    <div className="flex flex-wrap gap-3 font-mono text-sm">
+    <div className="flex flex-wrap gap-3 font-mono">
       {items.map(it => (
         <div key={it.label} className="flex items-baseline gap-1">
           <span className={`text-xl font-black ${it.cls}`}>{it.value}</span>
@@ -74,25 +77,48 @@ interface DossierCardProps {
   dossier:      Dossier
   responsibles: Responsible[]
   onSave:       (status: PaymentStatusEnum, comment: string | null) => Promise<void>
+  onReset:      () => Promise<void>
 }
 
-function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
-  const [comment,  setComment]  = useState(dossier.comment ?? '')
-  const [saving,   setSaving]   = useState(false)
-  const [err,      setErr]      = useState<string | null>(null)
-  const savedCommentRef = useRef(dossier.comment ?? '')
+function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProps) {
+  const [pendingStatus, setPendingStatus] = useState<PaymentStatusEnum | null>(null)
+  const [comment,       setComment]       = useState('')
+  const [saving,        setSaving]        = useState(false)
+  const [err,           setErr]           = useState<string | null>(null)
 
-  // Sync si la prop change (ex: rechargement)
-  useEffect(() => {
-    setComment(dossier.comment ?? '')
-    savedCommentRef.current = dossier.comment ?? ''
-  }, [dossier.comment])
+  async function handleStatusClick(status: PaymentStatusEnum) {
+    setErr(null)
 
-  async function handleStatus(status: PaymentStatusEnum) {
+    // Cliquer sur le statut actif → remettre à vierge
+    if (dossier.status === status) {
+      setSaving(true)
+      try { await onReset() }
+      catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+      finally { setSaving(false) }
+      return
+    }
+
+    // Remboursé / Problème → demander un commentaire avant de confirmer
+    if (NEEDS_COMMENT.has(status)) {
+      setComment(dossier.comment ?? '')
+      setPendingStatus(status)
+      return
+    }
+
+    // Traité / En attente → sauvegarde immédiate
+    setSaving(true)
+    try { await onSave(status, null) }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(false) }
+  }
+
+  async function handleConfirm() {
+    if (!pendingStatus) return
     setSaving(true)
     setErr(null)
     try {
-      await onSave(status, comment.trim() || null)
+      await onSave(pendingStatus, comment.trim() || null)
+      setPendingStatus(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -100,20 +126,10 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
     }
   }
 
-  async function handleCommentBlur() {
-    const trimmed = comment.trim()
-    if (trimmed === savedCommentRef.current.trim()) return
-    if (!dossier.status) return          // pas de statut → ne pas créer une ligne vide
-    setSaving(true)
+  function cancelPending() {
+    setPendingStatus(null)
+    setComment('')
     setErr(null)
-    try {
-      await onSave(dossier.status, trimmed || null)
-      savedCommentRef.current = trimmed
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
-    }
   }
 
   const resp = responsibles.find(r => r.id === dossier.updated_by)
@@ -121,8 +137,8 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
   return (
     <div className={`border-b-2 border-noir/10 px-4 py-3 transition-opacity ${saving ? 'opacity-60' : ''}`}>
 
-      {/* ── En-tête : identité + méta ── */}
-      <div className="flex items-start justify-between gap-2 mb-2">
+      {/* ── Identité + méta ── */}
+      <div className="flex items-start justify-between gap-2 mb-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="font-bold text-sm text-noir">
@@ -166,38 +182,72 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
       </div>
 
       {/* ── Boutons de statut ── */}
-      <div className="flex flex-wrap gap-1.5">
-        {STATUS_OPTIONS.map(opt => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => handleStatus(opt.value)}
-            disabled={saving}
-            className={`
-              text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 border-2 transition-colors
-              ${dossier.status === opt.value
-                ? statusBtnActive(opt.value)
-                : 'bg-blanc border-noir/20 text-noir/60 hover:border-noir hover:text-noir'
-              }
-            `}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {!dossier.status && (
-          <span className="text-[11px] font-mono text-noir/30 self-center">À traiter</span>
-        )}
-      </div>
+      {!pendingStatus && (
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleStatusClick(opt.value)}
+              disabled={saving}
+              className={`
+                text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 border-2 transition-colors
+                ${dossier.status === opt.value
+                  ? statusBtnActive(opt.value)
+                  : 'bg-blanc border-noir/20 text-noir/60 hover:border-noir hover:text-noir'
+                }
+              `}
+            >
+              {opt.label}
+              {dossier.status === opt.value && ' ×'}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* ── Commentaire ── */}
-      <input
-        type="text"
-        value={comment}
-        onChange={e => setComment(e.target.value)}
-        onBlur={handleCommentBlur}
-        placeholder="Commentaire (optionnel)"
-        className="mt-2 w-full border border-noir/20 px-2.5 py-1.5 text-[11px] font-mono bg-blanc focus:outline-none focus:border-noir"
-      />
+      {/* ── Zone de confirmation (Remboursé / Problème) ── */}
+      {pendingStatus && (
+        <div className="space-y-2 bg-noir/[0.03] border border-noir/10 px-3 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-noir/60">
+            {pendingStatus} — commentaire (optionnel)
+          </p>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="Ex : chèque non reçu, remboursement demandé le…"
+            rows={2}
+            autoFocus
+            className="w-full border-2 border-noir/30 px-2.5 py-2 text-[11px] font-mono bg-blanc
+                       focus:outline-none focus:border-noir resize-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className="text-[11px] font-bold uppercase tracking-widest px-3 py-1.5
+                         bg-noir text-blanc border-2 border-noir hover:bg-blanc hover:text-noir
+                         transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Enregistrement…' : `Confirmer ${pendingStatus}`}
+            </button>
+            <button
+              onClick={cancelPending}
+              disabled={saving}
+              className="text-[11px] font-bold uppercase tracking-widest px-3 py-1.5
+                         border-2 border-noir/30 text-noir hover:border-noir transition-colors"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Commentaire existant (hors zone de confirmation) */}
+      {!pendingStatus && dossier.comment && (
+        <p className="mt-1.5 text-[11px] font-mono text-noir/50 italic border-l-2 border-noir/20 pl-2">
+          {dossier.comment}
+        </p>
+      )}
 
       {err && <p className="mt-1 text-[11px] font-mono text-red-600">{err}</p>}
 
@@ -205,7 +255,7 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
         <p className="mt-1 text-[10px] font-bold text-red-600">⚠ HelloAsso indique un remboursement</p>
       )}
 
-      {/* ── Échéances 3× ── */}
+      {/* Détail 3× */}
       {dossier.is_installment && dossier.installments.length > 1 && (
         <div className="mt-2 pt-1.5 border-t border-noir/10 space-y-0.5">
           {dossier.installments.map((inst, i) => (
@@ -215,8 +265,7 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
               <span>{formatDate(inst.payment_date)}</span>
               <span className={
                 inst.helloasso_status === 'Authorized' ? 'text-green-600' :
-                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500' :
-                ''
+                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500' : ''
               }>{inst.helloasso_status}</span>
             </div>
           ))}
@@ -229,13 +278,14 @@ function DossierCard({ dossier, responsibles, onSave }: DossierCardProps) {
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function ValidationPage() {
-  const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus } = useDossiers()
+  const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus, resetStatus } = useDossiers()
   const { loading: syncLoading, error: syncError, result: syncResult, lastSyncAt, sync } = useSyncHelloasso()
 
   useEffect(() => { sync() }, [sync]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [search,       setSearch]       = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  // Par défaut : uniquement les dossiers vierges (pas encore traités)
+  const [filterStatus, setFilterStatus] = useState('À traiter')
   const [filterType,   setFilterType]   = useState('')
   const [filterGroup,  setFilterGroup]  = useState('')
 
@@ -247,6 +297,7 @@ export default function ValidationPage() {
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [dossiers])
 
+  // Stats calculées sur TOUS les dossiers (pas sur filtrés)
   const filtered = useMemo(() => {
     const q = normalise(search.trim())
     return dossiers.filter(d => {
@@ -293,17 +344,20 @@ export default function ValidationPage() {
           {syncLoading ? '⟳ Sync…' : '⟳ Sync HelloAsso'}
         </button>
         <span className="font-mono text-xs text-noir/40">
-          {lastSyncAt ? `${new Date(lastSyncAt).toLocaleTimeString('fr-FR')}` : 'Pas encore synchronisé'}
+          {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString('fr-FR') : 'Pas encore synchronisé'}
         </span>
         {syncResult && syncResult.synced_count > 0 && (
           <span className="font-mono text-xs text-green-600">+{syncResult.synced_count} importé{syncResult.synced_count > 1 ? 's' : ''}</span>
         )}
-        {syncError && (
-          <span className="font-mono text-xs text-red-600">Sync : {syncError}</span>
+        {syncError && <span className="font-mono text-xs text-red-600">Sync : {syncError}</span>}
+        {syncResult?.errors && syncResult.errors.length > 0 && (
+          <span className="font-mono text-xs text-orange-600" title={syncResult.errors.join('\n')}>
+            ⚠ {syncResult.errors.length} erreur{syncResult.errors.length > 1 ? 's' : ''} (hover)
+          </span>
         )}
       </div>
 
-      {/* Stats */}
+      {/* Stats sur tous les dossiers */}
       {!dossiersLoading && !dossiersError && <StatsBar dossiers={dossiers} />}
 
       {dossiersError && (
@@ -319,20 +373,24 @@ export default function ValidationPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Rechercher…"
-          className="border-2 border-noir px-3 py-1.5 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20 w-40 min-w-0"
+          className="border-2 border-noir px-3 py-1.5 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20 w-36 min-w-0"
         />
+
+        {/* Filtre statut */}
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           className="border-2 border-noir px-2 py-1.5 text-sm font-mono bg-blanc focus:outline-none">
-          <option value="">Tous statuts</option>
+          <option value="">Tous</option>
           <option value="À traiter">À traiter</option>
           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           className="border-2 border-noir px-2 py-1.5 text-sm font-mono bg-blanc focus:outline-none">
           <option value="">1× et 3×</option>
           <option value="1x">1× only</option>
           <option value="3x">3× only</option>
         </select>
+
         {allGroups.length > 0 && (
           <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
             className="border-2 border-noir px-2 py-1.5 text-sm font-mono bg-blanc focus:outline-none">
@@ -340,9 +398,10 @@ export default function ValidationPage() {
             {allGroups.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </select>
         )}
-        {(search || filterStatus || filterType || filterGroup) && (
+
+        {(search || filterType || filterGroup || filterStatus !== 'À traiter') && (
           <button
-            onClick={() => { setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGroup('') }}
+            onClick={() => { setSearch(''); setFilterStatus('À traiter'); setFilterType(''); setFilterGroup('') }}
             className="text-xs font-mono text-noir/50 underline hover:text-noir"
           >
             ↺ Reset
@@ -373,13 +432,18 @@ export default function ValidationPage() {
 
           {!dossiersLoading && !dossiersError && dossiers.length === 0 && (
             <div className="px-5 py-8 text-center">
-              <p className="font-mono text-sm text-noir/40 mb-2">Aucun paiement à afficher.</p>
+              <p className="font-mono text-sm text-noir/40 mb-1">Aucun paiement à afficher.</p>
               <p className="font-mono text-xs text-noir/30">Vérifiez que vos liens HelloAsso vous sont assignés dans Config.</p>
             </div>
           )}
 
-          {!dossiersLoading && !dossiersError && dossiers.length > 0 && filtered.length === 0 && (
-            <p className="px-5 py-6 font-mono text-sm text-noir/40">Aucun dossier ne correspond aux filtres.</p>
+          {!dossiersLoading && dossiers.length > 0 && filtered.length === 0 && (
+            <p className="px-5 py-8 font-mono text-sm text-noir/40 text-center">
+              {filterStatus === 'À traiter'
+                ? '✓ Tous les dossiers ont été traités !'
+                : 'Aucun dossier ne correspond aux filtres.'
+              }
+            </p>
           )}
 
           {!dossiersLoading && filtered.map(d => (
@@ -388,6 +452,7 @@ export default function ValidationPage() {
               dossier={d}
               responsibles={responsibles}
               onSave={(status, comment) => upsertStatus(d.dossier_key, status, comment)}
+              onReset={() => resetStatus(d.dossier_key)}
             />
           ))}
         </div>
