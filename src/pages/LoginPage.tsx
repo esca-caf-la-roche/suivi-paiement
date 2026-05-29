@@ -36,9 +36,9 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     const { error } = await supabase.auth.verifyOtp({
-      email,
+      email: email.trim().toLowerCase(),
       token: otp.trim(),
-      type: 'email',
+      type: 'magiclink',
     })
     setLoading(false)
     if (error) {
