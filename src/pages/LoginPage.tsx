@@ -42,7 +42,8 @@ export default function LoginPage() {
     })
     setLoading(false)
     if (error) {
-      setError('Code invalide ou expiré. Vérifiez le code ou recommencez.')
+      console.error('verifyOtp error:', error)
+      setError(`Code invalide ou expiré (${error.message}). Vérifiez le code ou recommencez.`)
     }
     // Si OK, onAuthStateChange dans AuthContext met à jour la session → redirect auto
   }
