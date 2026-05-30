@@ -31,25 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Session initiale (au montage)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session?.user) {
-        loadResponsible(session.user.id).finally(() => setLoading(false))
-      } else {
-        setLoading(false)
-      }
-    })
-
-    // Écoute les changements de session (login / logout / token refresh)
+    // onAuthStateChange est la source de vérité unique pour la session.
+    // Il se déclenche immédiatement au montage avec la session existante,
+    // ET à chaque login/logout/refresh — donc on y gère aussi setLoading.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session)
         if (session?.user) {
-          loadResponsible(session.user.id)
+          await loadResponsible(session.user.id)
         } else {
           setResponsible(null)
         }
+        // Toujours lever le loading une fois qu'on a la réponse
+        setLoading(false)
       }
     )
 
