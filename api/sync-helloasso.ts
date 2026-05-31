@@ -53,7 +53,13 @@ interface HaPayment {
 
 interface HaResponse {
   data:       HaPayment[]
-  pagination: { pageIndex: number; pageSize: number; totalCount: number; totalPages: number }
+  pagination?: {
+    pageIndex?: number
+    pageSize?: number
+    totalCount?: number
+    totalPages?: number
+    continuationToken?: string
+  }
 }
 
 interface RegistrantRow {
@@ -121,11 +127,16 @@ async function fetchAllPayments(
   formSlug: string,
 ): Promise<HaPayment[]> {
   const all: HaPayment[] = []
-  let page = 1, totalPages = 1
+  let continuationToken: string | undefined = undefined
 
   do {
-    const url = `${HA_API_BASE}/organizations/${orgSlug}/forms/${formType}/${formSlug}/payments?pageIndex=${page}&pageSize=100`
-    const res = await fetch(url, {
+    const url = new URL(`${HA_API_BASE}/organizations/${orgSlug}/forms/${formType}/${formSlug}/payments`)
+    url.searchParams.set('pageSize', '100')
+    if (continuationToken) {
+      url.searchParams.set('continuationToken', continuationToken)
+    }
+
+    const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     })
     if (!res.ok) {
@@ -133,10 +144,14 @@ async function fetchAllPayments(
       throw new Error(`HelloAsso payments [${formSlug}] (${res.status}): ${body.slice(0, 200)}`)
     }
     const json: HaResponse = await res.json()
+    
+    if (!json.data || json.data.length === 0) {
+      break
+    }
+    
     all.push(...json.data)
-    totalPages = json.pagination.totalPages
-    page++
-  } while (page <= totalPages)
+    continuationToken = json.pagination?.continuationToken
+  } while (continuationToken)
 
   return all
 }
