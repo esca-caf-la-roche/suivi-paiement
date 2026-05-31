@@ -17,10 +17,6 @@ const NEEDS_COMMENT = new Set<PaymentStatusEnum>(['En attente', 'Remboursé', 'P
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   const dateStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
