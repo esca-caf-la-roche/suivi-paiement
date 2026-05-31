@@ -264,7 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Token HelloAsso
-    const token = await getAccessToken(clientId, clientSecret)
+    const helloassoToken = await getAccessToken(clientId, clientSecret)
 
         const now    = new Date().toISOString()
     const errors: string[] = []
@@ -277,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue
       }
       try {
-        const payments = await fetchAllPayments(token, parsed.orgSlug, parsed.formType, parsed.formSlug)
+        const payments = await fetchAllPayments(helloassoToken, parsed.orgSlug, parsed.formType, parsed.formSlug)
         console.log(`[sync-helloasso] ${link.label} → ${payments.length} paiements`)
         for (const p of payments) {
           rawPayments.push({ payment: p, link })
