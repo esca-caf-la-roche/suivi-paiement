@@ -95,8 +95,6 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
   const [saving, setSaving]       = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const [formError, setFormError] = useState<string | null>(null)
-
   function openAdd() {
     setEditId(null)
     setForm(makeEmptyLink(currentUserId))
@@ -302,8 +300,6 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
   const [form, setForm]           = useState<NewGroup>(EMPTY_GROUP)
   const [saving, setSaving]       = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-
-  const principalLinks = links.filter(l => !l.is_installment)
 
   function openAdd() { setEditId(null); setForm(EMPTY_GROUP); setFormError(null); setShowForm(true) }
   function openEdit(group: Group) { setEditId(group.id); setForm({ name: group.name, link_ids: group.link_ids ?? [] }); setFormError(null); setShowForm(true) }
