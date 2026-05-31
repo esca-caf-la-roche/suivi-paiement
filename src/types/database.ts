@@ -137,6 +137,8 @@ export interface Dossier {
   updated_at:         string | null
   /** ⚠️ Divergence : statut local "Traité" mais HelloAsso dit "Refunded" */
   has_status_mismatch: boolean
+  /** TRUE si (local = Remboursé ET HA != Refunded) OU (local != Remboursé ET HA == Refunded) */
+  needs_refund_action: boolean
 }
 
 // ---------------------------------------------------------------------------

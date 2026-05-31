@@ -126,6 +126,13 @@ export function useDossiers(): UseDossiersReturn {
           status === 'Traité' &&
           regs.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused')
 
+        // Logique pour le suivi des remboursements
+        const isLocallyRefunded = status === 'Remboursé'
+        const isHARefunded = regs.every(r => r.helloasso_status === 'Refunded')
+        
+        // Vrai si le local dit Remboursé mais HA ne l'est pas, OU si HA est remboursé mais le local n'est pas "Remboursé"
+        const needs_refund_action = (isLocallyRefunded && !isHARefunded) || (!isLocallyRefunded && isHARefunded)
+
         result.push({
           dossier_key:        dossierKey,
           is_installment:     link.is_installment,
@@ -141,6 +148,7 @@ export function useDossiers(): UseDossiersReturn {
           updated_by,
           updated_at,
           has_status_mismatch,
+          needs_refund_action,
         })
       }
 
@@ -194,6 +202,9 @@ export function useDossiers(): UseDossiersReturn {
         has_status_mismatch:
           status === 'Traité' &&
           d.installments.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused'),
+        needs_refund_action:
+          (status === 'Remboursé' && !d.installments.every(r => r.helloasso_status === 'Refunded')) ||
+          (status !== 'Remboursé' && d.installments.every(r => r.helloasso_status === 'Refunded')),
       }
     }))
   }, [dossiers, user])
@@ -212,7 +223,15 @@ export function useDossiers(): UseDossiersReturn {
 
     setDossiers(prev => prev.map(d => {
       if (d.dossier_key !== dossierKey) return d
-      return { ...d, status: null, comment: null, updated_by: null, updated_at: null, has_status_mismatch: false }
+      return { 
+        ...d, 
+        status: null, 
+        comment: null, 
+        updated_by: null, 
+        updated_at: null, 
+        has_status_mismatch: false,
+        needs_refund_action: d.installments.every(r => r.helloasso_status === 'Refunded')
+      }
     }))
   }, [dossiers])
 

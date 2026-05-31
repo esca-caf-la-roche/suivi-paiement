@@ -251,8 +251,18 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
 
       {err && <p className="mt-1 text-[11px] font-mono text-red-600">{err}</p>}
 
-      {dossier.has_status_mismatch && (
+      {dossier.has_status_mismatch && !dossier.needs_refund_action && (
         <p className="mt-1 text-[10px] font-bold text-red-600">⚠ HelloAsso indique un remboursement</p>
+      )}
+
+      {dossier.needs_refund_action && (
+        <div className="mt-2 bg-orange-100 border-l-4 border-orange-500 px-3 py-2">
+          <p className="text-[11px] font-bold text-orange-800">
+            {dossier.status === 'Remboursé' 
+              ? '⚠ Remboursement demandé localement. À effectuer sur HelloAsso.'
+              : '⚠ Remboursé sur HelloAsso. Mettre à jour le statut local.'}
+          </p>
+        </div>
       )}
 
       {/* Détail 3× */}
@@ -309,7 +319,11 @@ export default function ValidationPage() {
         if (!hay.includes(q)) return false
       }
       if (filterStatus) {
-        if ((d.status ?? 'À traiter') !== filterStatus) return false
+        if (filterStatus === 'Suivi Remboursements') {
+          if (!d.needs_refund_action) return false
+        } else if ((d.status ?? 'À traiter') !== filterStatus) {
+          return false
+        }
       }
       if (filterType === '1x' && d.is_installment)  return false
       if (filterType === '3x' && !d.is_installment) return false
@@ -382,6 +396,7 @@ export default function ValidationPage() {
           <option value="">Tous</option>
           <option value="À traiter">À traiter</option>
           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="Suivi Remboursements">Suivi Remboursements</option>
         </select>
 
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
