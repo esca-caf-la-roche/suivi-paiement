@@ -48,7 +48,7 @@ export default function LoginPage() {
       setError(`Code invalide ou expiré (${error.message}). Vérifiez le code ou recommencez.`)
     } else {
       // Navigation explicite — ne pas attendre onAuthStateChange
-      navigate('/config', { replace: true })
+      navigate('/validation', { replace: true })
     }
   }
 
