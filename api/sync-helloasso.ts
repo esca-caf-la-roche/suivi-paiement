@@ -61,6 +61,8 @@ interface HaPayment {
   items?: HaItem[]
   initialTransactionId?: number
   refundOperations?: HaRefundOperation[]
+  paymentReceiptUrl?: string
+  fiscalReceiptUrl?:  string
 }
 
 interface HaResponse {
@@ -94,6 +96,8 @@ interface TransactionRow {
   payment_date:         string
   helloasso_status:     string
   synced_at:            string
+  payment_receipt_url:  string | null
+  fiscal_receipt_url:   string | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -349,6 +353,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           payment_date:         p.date,
           helloasso_status:     p.state,
           synced_at:            now,
+          payment_receipt_url:  p.paymentReceiptUrl || null,
+          fiscal_receipt_url:   p.fiscalReceiptUrl || null,
         })
 
         // Si des opérations de remboursement sont présentes, on les insère comme transactions de remboursement datées
@@ -361,6 +367,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               payment_date:         refund.meta?.createdAt || p.date, // Date de remboursement HelloAsso ou date du paiement initial
               helloasso_status:     'Refunded',
               synced_at:            now,
+              payment_receipt_url:  null,
+              fiscal_receipt_url:   null,
             })
           }
         }

@@ -287,7 +287,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
             const isRefunded = inst.helloasso_status === 'Refunded'
 
             return (
-              <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40 flex-wrap">
+              <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40 flex-wrap items-center py-0.5">
                 <span className={`flex-shrink-0 w-28 ${isRefund ? 'text-red-500 font-bold' : ''}`}>
                   {label}
                 </span>
@@ -301,6 +301,32 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
                 }>
                   → {isSuccess ? 'Validé' : (isRefunded ? 'Remboursé' : inst.helloasso_status)}
                 </span>
+                {(inst.payment_receipt_url || inst.fiscal_receipt_url) && (
+                  <div className="flex gap-1.5 ml-auto">
+                    {inst.payment_receipt_url && (
+                      <a
+                        href={inst.payment_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border border-noir bg-blanc hover:bg-citron hover:text-noir text-noir/70 transition-colors shadow-[1px_1px_0px_#000000] active:translate-y-px active:shadow-none flex items-center gap-1"
+                        title="Télécharger l'attestation de paiement"
+                      >
+                        📄 Attestation
+                      </a>
+                    )}
+                    {inst.fiscal_receipt_url && (
+                      <a
+                        href={inst.fiscal_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border border-noir bg-blanc hover:bg-citron hover:text-noir text-noir/70 transition-colors shadow-[1px_1px_0px_#000000] active:translate-y-px active:shadow-none flex items-center gap-1"
+                        title="Télécharger le reçu fiscal"
+                      >
+                        💼 Reçu Fiscal
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

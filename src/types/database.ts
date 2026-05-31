@@ -84,6 +84,8 @@ export interface HelloassoTransaction {
   payment_date:         string            // ISO 8601
   helloasso_status:     string            // "Authorized" | "Refunded" | "Refused" | …
   synced_at:            string            // ISO 8601
+  payment_receipt_url?: string | null
+  fiscal_receipt_url?:  string | null
 }
 
 /** Table : payments_status_history (alimentée par trigger, jamais par le front) */
