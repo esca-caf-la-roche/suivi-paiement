@@ -30,7 +30,7 @@ function truncateUrl(url: string, max = 55): string {
 export default function ConfigPage() {
   const { user } = useAuth()
   const { links, loading: linksLoading, error: linksError, addLink, updateLink, deleteLink } = useHelloassoLinks()
-  const { groups, loading: groupsLoading, error: groupsError, addGroup, updateGroup, deleteGroup } = useGroups()
+  const { groups, loading: groupsLoading, error: groupsError, addGroup, updateGroup, deleteGroup, refresh: refreshGroups } = useGroups()
 
   const [responsibles, setResponsibles] = useState<Responsible[]>([])
 
@@ -39,6 +39,11 @@ export default function ConfigPage() {
       if (data) setResponsibles(data)
     })
   }, [])
+
+  const handleDeleteLink = async (id: string) => {
+    await deleteLink(id)
+    refreshGroups()
+  }
 
   return (
     <div className="space-y-10">
@@ -57,7 +62,7 @@ export default function ConfigPage() {
         currentUserId={user?.id ?? ''}
         onAdd={addLink}
         onUpdate={updateLink}
-        onDelete={deleteLink}
+        onDelete={handleDeleteLink}
       />
 
       <GroupsSection
