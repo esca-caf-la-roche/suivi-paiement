@@ -38,12 +38,14 @@ export function useDossiers(): UseDossiersReturn {
         { data: registrantsRaw, error: regErr },
         { data: linksRaw,       error: linksErr },
         { data: groupsRaw,      error: groupsErr },
+        { data: groupLinksRaw,  error: glErr },
         { data: statusesRaw,    error: statusesErr },
         { data: responsiblesRaw, error: respErr },
       ] = await Promise.all([
         supabase.from('registrants').select('*'),
         supabase.from('helloasso_links').select('*'),
         supabase.from('groups').select('*'),
+        supabase.from('group_links').select('*'),
         supabase.from('payments_status').select('*'),
         supabase.from('responsibles').select('*'),
       ])
@@ -51,12 +53,14 @@ export function useDossiers(): UseDossiersReturn {
       if (regErr)      throw regErr
       if (linksErr)    throw linksErr
       if (groupsErr)   throw groupsErr
+      if (glErr)       throw glErr
       if (statusesErr) throw statusesErr
       if (respErr)     throw respErr
 
       const registrants:  Registrant[]    = registrantsRaw  ?? []
       const links:        HelloassoLink[] = linksRaw        ?? []
       const groups:       Group[]         = groupsRaw       ?? []
+      const groupLinks:   any[]           = groupLinksRaw   ?? []
       const statuses:     any[]           = statusesRaw     ?? []
       const resps:        Responsible[]   = responsiblesRaw ?? []
 
@@ -65,11 +69,18 @@ export function useDossiers(): UseDossiersReturn {
       const linksMap  = new Map<string, HelloassoLink>(links.map(l => [l.id, l]))
       const statusMap = new Map<string, any>(statuses.map(s => [s.helloasso_payment_id, s]))
 
+      const linkToGroups = new Map<string, string[]>()
+      for (const gl of groupLinks) {
+        if (!linkToGroups.has(gl.link_id)) linkToGroups.set(gl.link_id, [])
+        linkToGroups.get(gl.link_id)!.push(gl.group_id)
+      }
+
       const dossierMap = new Map<string, Registrant[]>()
       for (const reg of registrants) {
         const link = linksMap.get(reg.helloasso_link_id)
         if (!link) continue
-        const key = computeDossierKey(reg, link)
+        const groupIds = linkToGroups.get(link.id) ?? []
+        const key = computeDossierKey(reg, link.is_installment, groupIds)
         if (!dossierMap.has(key)) dossierMap.set(key, [])
         dossierMap.get(key)!.push(reg)
       }
@@ -82,14 +93,10 @@ export function useDossiers(): UseDossiersReturn {
         const first = regs[0]
         const link  = linksMap.get(first.helloasso_link_id)!
 
-        const principalLinkId = link.is_installment && link.parent_link_id
-          ? link.parent_link_id
-          : link.id
+        if (link.responsible_id && link.responsible_id !== user?.id) continue
 
-        const principalLink = linksMap.get(principalLinkId)
-        if (principalLink?.responsible_id && principalLink.responsible_id !== user?.id) continue
-
-        const dossierGroups = groups.filter(g => g.link_id === principalLinkId)
+        const groupIds = linkToGroups.get(link.id) ?? []
+        const dossierGroups = groups.filter(g => groupIds.includes(g.id))
 
         const dossierStatuses = regs
           .map(r => statusMap.get(r.helloasso_payment_id))

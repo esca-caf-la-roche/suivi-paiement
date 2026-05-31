@@ -14,12 +14,11 @@ function makeEmptyLink(defaultResponsibleId: string): NewHelloassoLink {
     url:            '',
     label:          '',
     is_installment: false,
-    parent_link_id: null,
     responsible_id: defaultResponsibleId || null,
   }
 }
 
-const EMPTY_GROUP: NewGroup = { name: '', link_id: '' }
+const EMPTY_GROUP: NewGroup = { name: '', link_ids: [] }
 
 function truncateUrl(url: string, max = 55): string {
   if (url.length <= max) return url
@@ -96,7 +95,7 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
   const [saving, setSaving]       = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const masterLinks = links.filter(l => !l.is_installment && l.id !== editId)
+  const [formError, setFormError] = useState<string | null>(null)
 
   function openAdd() {
     setEditId(null)
@@ -111,7 +110,6 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
       url:            link.url,
       label:          link.label,
       is_installment: link.is_installment,
-      parent_link_id: link.parent_link_id,
       responsible_id: link.responsible_id ?? null,
     })
     setFormError(null)
@@ -129,10 +127,6 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
     e.preventDefault()
     if (!form.url.trim() || !form.label.trim()) {
       setFormError('Le label et l\'URL sont requis.')
-      return
-    }
-    if (form.is_installment && !form.parent_link_id) {
-      setFormError('Un lien d\'échéance doit avoir un lien maître.')
       return
     }
     setSaving(true)
@@ -158,11 +152,6 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
   }
 
   const sortedLinks = [...links].sort((a, b) => {
-    const aKey = a.parent_link_id ?? a.id
-    const bKey = b.parent_link_id ?? b.id
-    if (aKey !== bKey) return aKey.localeCompare(bKey)
-    if (!a.parent_link_id && b.parent_link_id) return -1
-    if (a.parent_link_id && !b.parent_link_id) return 1
     return a.label.localeCompare(b.label)
   })
 
@@ -189,22 +178,19 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
         )}
 
         {sortedLinks.map(link => {
-          const parentLabel = link.parent_link_id ? links.find(l => l.id === link.parent_link_id)?.label : null
           const respName    = responsibles.find(r => r.id === link.responsible_id)?.name
 
           return (
             <div
               key={link.id}
-              className={`border-b-2 border-noir/10 px-5 py-3 flex items-start gap-3 hover:bg-noir/[0.02] ${link.is_installment ? 'pl-10 bg-noir/[0.015]' : ''}`}
+              className={`border-b-2 border-noir/10 px-5 py-3 flex items-start gap-3 hover:bg-noir/[0.02] ${link.is_installment ? 'bg-noir/[0.015]' : ''}`}
             >
-              {link.is_installment && <span className="mt-0.5 text-noir/30 text-xs font-mono flex-shrink-0">↳</span>}
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm text-noir">{link.label}</span>
                   {link.is_installment ? (
                     <span className="text-xs font-mono bg-glace/30 border border-glace px-1.5 py-0.5">
-                      Échéance{parentLabel && <span className="text-noir/50"> → {parentLabel}</span>}
+                      Échéance 3x
                     </span>
                   ) : (
                     <span className="text-xs font-mono bg-citron/40 border border-citron/60 px-1.5 py-0.5">Principal</span>
@@ -264,8 +250,8 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
               <div className="flex gap-3 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="link-type" checked={!form.is_installment}
-                    onChange={() => setForm(f => ({ ...f, is_installment: false, parent_link_id: null }))} className="accent-noir" />
-                  <span className="text-sm font-medium">Lien principal (1x ou maître 3x)</span>
+                    onChange={() => setForm(f => ({ ...f, is_installment: false }))} className="accent-noir" />
+                  <span className="text-sm font-medium">Lien principal</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="link-type" checked={form.is_installment}
@@ -274,17 +260,6 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
                 </label>
               </div>
             </div>
-
-            {form.is_installment && (
-              <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase tracking-widest text-noir">Lien maître</label>
-                <select value={form.parent_link_id ?? ''} onChange={e => setForm(f => ({ ...f, parent_link_id: e.target.value || null }))}
-                  className="w-full border-2 border-noir px-3 py-2 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20">
-                  <option value="">— Sélectionner un lien principal —</option>
-                  {masterLinks.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                </select>
-              </div>
-            )}
 
             {formError && (
               <p className="text-sm font-mono text-red-600 bg-red-50 border-l-4 border-red-500 px-3 py-2">{formError}</p>
@@ -331,13 +306,12 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
   const principalLinks = links.filter(l => !l.is_installment)
 
   function openAdd() { setEditId(null); setForm(EMPTY_GROUP); setFormError(null); setShowForm(true) }
-  function openEdit(group: Group) { setEditId(group.id); setForm({ name: group.name, link_id: group.link_id }); setFormError(null); setShowForm(true) }
+  function openEdit(group: Group) { setEditId(group.id); setForm({ name: group.name, link_ids: group.link_ids ?? [] }); setFormError(null); setShowForm(true) }
   function cancelForm() { setShowForm(false); setEditId(null); setForm(EMPTY_GROUP); setFormError(null) }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) { setFormError('Le nom du groupe est requis.'); return }
-    if (!form.link_id)     { setFormError('Un lien HelloAsso est requis.'); return }
     setSaving(true); setFormError(null)
     try {
       if (editId) { await onUpdate(editId, form) } else { await onAdd(form) }
@@ -374,19 +348,22 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
         {!loading && groups.length === 0 && !showForm && <p className="px-5 py-6 font-mono text-sm text-noir/40">Aucun groupe configuré.</p>}
 
         {[...groups]
-          .sort((a, b) => {
-            const la = links.find(l => l.id === a.link_id)?.label ?? ''
-            const lb = links.find(l => l.id === b.link_id)?.label ?? ''
-            if (la !== lb) return la.localeCompare(lb)
-            return a.name.localeCompare(b.name)
-          })
+          .sort((a, b) => a.name.localeCompare(b.name))
           .map(group => {
-            const linkLabel = links.find(l => l.id === group.link_id)?.label ?? group.link_id
+            const groupLinks = links.filter(l => group.link_ids?.includes(l.id))
             return (
-              <div key={group.id} className="border-b-2 border-noir/10 px-5 py-3 flex items-center gap-3 hover:bg-noir/[0.02]">
+              <div key={group.id} className="border-b-2 border-noir/10 px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-noir/[0.02]">
                 <div className="flex-1 min-w-0">
                   <span className="font-bold text-sm text-noir">{group.name}</span>
-                  <span className="ml-3 text-xs font-mono text-noir/50">→ {linkLabel}</span>
+                  {groupLinks.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {groupLinks.map(l => (
+                        <span key={l.id} className="text-xs font-mono bg-noir/5 text-noir px-2 py-0.5 rounded border border-noir/10">
+                          {l.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <button onClick={() => openEdit(group)} className="text-xs font-bold px-2 py-1 border-2 border-noir hover:bg-noir hover:text-blanc transition-colors">✎</button>
@@ -407,16 +384,34 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
                 className="w-full border-2 border-noir px-3 py-2 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20" />
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-bold uppercase tracking-widest text-noir">Lien HelloAsso associé</label>
-              {principalLinks.length === 0 ? (
-                <p className="text-xs font-mono text-noir/50 italic">Ajoutez d'abord un lien principal.</p>
+            <div className="space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-widest text-noir">Liens HelloAsso associés</label>
+              {links.length === 0 ? (
+                <p className="text-xs font-mono text-noir/50 italic">Ajoutez d'abord des liens HelloAsso.</p>
               ) : (
-                <select value={form.link_id} onChange={e => setForm(f => ({ ...f, link_id: e.target.value }))}
-                  className="w-full border-2 border-noir px-3 py-2 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20">
-                  <option value="">— Sélectionner un lien —</option>
-                  {principalLinks.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                </select>
+                <div className="space-y-2 max-h-48 overflow-y-auto border-2 border-noir p-3 bg-blanc">
+                  {links.map(link => (
+                    <label key={link.id} className="flex items-center gap-2 cursor-pointer hover:bg-noir/5 p-1 -mx-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={form.link_ids.includes(link.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked
+                          setForm(f => ({
+                            ...f,
+                            link_ids: isChecked
+                              ? [...f.link_ids, link.id]
+                              : f.link_ids.filter(id => id !== link.id)
+                          }))
+                        }}
+                        className="accent-noir w-4 h-4"
+                      />
+                      <span className="text-sm font-medium text-noir">
+                        {link.label} {link.is_installment && <span className="text-xs text-noir/50 font-normal">(3x)</span>}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
 

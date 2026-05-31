@@ -6,7 +6,6 @@ export interface NewHelloassoLink {
   url:            string
   label:          string
   is_installment: boolean
-  parent_link_id: string | null
   responsible_id: string | null
 }
 
@@ -57,7 +56,6 @@ export function useHelloassoLinks(): UseHelloassoLinksReturn {
         url:            data.url,
         label:          data.label,
         is_installment: data.is_installment,
-        parent_link_id: data.parent_link_id,
         responsible_id: data.responsible_id || null,
       })
     if (error) throw new Error(error.message)

@@ -27,15 +27,14 @@ export interface Responsible {
 /**
  * Table : helloasso_links
  *
- * - parent_link_id === null  → lien principal (1x ou lien maître d'un 3x)
- * - parent_link_id !== null  → lien d'échéance 3x, rattaché au lien maître
+ * Les liens 3x sont maintenant des liens indépendants. 
+ * Ils sont rattachés aux mêmes groupes que les liens normaux correspondants via la table group_links.
  */
 export interface HelloassoLink {
   id:             string    // uuid
   url:            string
   label:          string    // ex: "Tarif 280€", "Échéance 2/3"
   responsible_id: string    // uuid → responsibles.id
-  parent_link_id: string | null
   is_installment: boolean
   created_at:     string    // ISO 8601
 }
@@ -44,7 +43,12 @@ export interface HelloassoLink {
 export interface Group {
   id:      string   // uuid
   name:    string   // "5-6 ans", "Primaires (débutants)", etc.
-  link_id: string   // uuid → helloasso_links.id (lien principal uniquement)
+}
+
+/** Table de liaison : group_links */
+export interface GroupLink {
+  group_id: string // uuid → groups.id
+  link_id:  string // uuid → helloasso_links.id
 }
 
 /**
@@ -77,7 +81,7 @@ export interface Registrant {
  *   - Ligne créée uniquement à la première action de l'encadrant
  *
  * dossier_key :
- *   - Paiement 3x → `${payer_email}::${parent_link_id}`
+ *   - Paiement 3x → `${payer_email}::${group_ids}`
  *   - Paiement 1x → helloasso_payment_id
  */
 export interface PaymentStatus {
@@ -141,16 +145,18 @@ export interface Dossier {
 /**
  * Calcule la dossier_key pour un paiement donné.
  *
- * @param registrant  L'enregistrement de paiement HelloAsso
- * @param link        Le lien HelloAsso associé
+ * @param registrant      L'enregistrement de paiement HelloAsso
+ * @param is_installment  Indique si le lien est un paiement fractionné
+ * @param groupIds        La liste des IDs de groupes auxquels le lien appartient
  */
 export function computeDossierKey(
   registrant: Pick<Registrant, 'helloasso_payment_id' | 'payer_email'>,
-  link: Pick<HelloassoLink, 'parent_link_id'>,
+  is_installment: boolean,
+  groupIds: string[]
 ): string {
-  if (link.parent_link_id !== null) {
-    // Paiement 3x : regrouper par payeur + lien parent
-    return `${registrant.payer_email}::${link.parent_link_id}`
+  if (is_installment && groupIds.length > 0) {
+    // Paiement 3x : regrouper par payeur + combinaison des groupes associés
+    return `${registrant.payer_email}::${[...groupIds].sort().join(',')}`
   }
   // Paiement 1x : clé unique = payment id
   return registrant.helloasso_payment_id
