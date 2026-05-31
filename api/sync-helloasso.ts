@@ -45,7 +45,10 @@ interface HaRefundOperation {
   id:        number
   amount:    number
   amountTip: number
-  createdAt: string
+  meta?: {
+    createdAt?: string
+    updatedAt?: string
+  }
 }
 
 interface HaPayment {
@@ -327,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               helloasso_payment_id: `refund-${refund.id}`,
               dossier_id:           dossierId,
               amount:               -(refund.amount / 100),
-              payment_date:         refund.createdAt, // Date officielle HelloAsso
+              payment_date:         refund.meta?.createdAt || p.date || now, // Date officielle HelloAsso ou fallbacks
               helloasso_status:     'Refunded',
               synced_at:            now,
             })
