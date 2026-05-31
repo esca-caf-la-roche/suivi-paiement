@@ -63,19 +63,24 @@ interface HaResponse {
   }
 }
 
-interface RegistrantRow {
+interface DossierRow {
+  id:                 string
+  helloasso_link_id:  string
+  first_name:         string
+  last_name:          string
+  email:              string | null
+  phone:              string | null
+  payer_first_name:   string
+  payer_last_name:    string
+  payer_email:        string
+  total_amount:       number
+}
+
+interface TransactionRow {
   helloasso_payment_id: string
-  helloasso_order_id:   string | null
-  helloasso_link_id:    string
-  first_name:           string
-  last_name:            string
-  email:                string | null
-  phone:                string | null
-  payer_first_name:     string
-  payer_last_name:      string
-  payer_email:          string
-  payment_date:         string
+  dossier_id:           string
   amount:               number
+  payment_date:         string
   helloasso_status:     string
   synced_at:            string
 }
@@ -174,33 +179,7 @@ function extractPhone(items?: HaItem[]): string | null {
   return null
 }
 
-function mapPayment(payment: HaPayment, linkId: string, now: string): RegistrantRow {
-  const payer     = payment.payer ?? payment.order?.payer ?? {}
-  const firstItem = payment.items?.[0]
-  const user      = firstItem?.user ?? {}
-  // Pour le regroupement, l'API HelloAsso crée un NOUVEAU order.id pour un remboursement.
-  // La seule vraie constante qui relie tout le monde (remboursements ET échéances 3x) est l'initialTransactionId !
-  const groupingId = payment.initialTransactionId 
-      ? String(payment.initialTransactionId) 
-      : String(payment.id);
-
-  return {
-    helloasso_payment_id: String(payment.id),
-    helloasso_order_id:   groupingId,
-    helloasso_link_id:    linkId,
-    first_name:           user.firstName  || payer.firstName || '',
-    last_name:            user.lastName   || payer.lastName  || '',
-    email:                user.email      ?? null,
-    phone:                extractPhone(payment.items),
-    payer_first_name:     payer.firstName ?? '',
-    payer_last_name:      payer.lastName  ?? '',
-    payer_email:          payer.email     ?? '',
-    payment_date:         payment.date,
-    amount:               payment.amount / 100,
-    helloasso_status:     payment.state,
-    synced_at:            now,
-  }
-}
+// mapPayment a été supprimé au profit d'un regroupement direct dans le handler
 
 // ─── Handler Vercel ───────────────────────────────────────────────────────────
 
@@ -244,9 +223,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Token HelloAsso
     const token = await getAccessToken(clientId, clientSecret)
 
-    const now    = new Date().toISOString()
+        const now    = new Date().toISOString()
     const errors: string[] = []
-    const rows:   RegistrantRow[] = []
+    const rawPayments: Array<{ payment: HaPayment; link: { id: string; label: string; is_installment: boolean } }> = []
 
     for (const link of links) {
       const parsed = parseHaUrl(link.url)
@@ -257,7 +236,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const payments = await fetchAllPayments(token, parsed.orgSlug, parsed.formType, parsed.formSlug)
         console.log(`[sync-helloasso] ${link.label} → ${payments.length} paiements`)
-        for (const p of payments) rows.push(mapPayment(p, link.id, now))
+        for (const p of payments) {
+          rawPayments.push({ payment: p, link })
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         errors.push(`[${link.label}] ${msg}`)
@@ -265,17 +246,94 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Upsert par lots de 500
+    // Regroupement par dossier_id
+    const dossiersMap = new Map<string, Array<{ payment: HaPayment; link: any }>>()
+    for (const item of rawPayments) {
+      const p = item.payment
+      const dossierId = p.initialTransactionId ? String(p.initialTransactionId) : String(p.id)
+      if (!dossiersMap.has(dossierId)) {
+        dossiersMap.set(dossierId, [])
+      }
+      dossiersMap.get(dossierId)!.push(item)
+    }
+
+    const dossierRows: DossierRow[] = []
+    const transactionRows: TransactionRow[] = []
+
+    function extractPhoneFromGroup(itemsList: HaPayment[]): string | null {
+      for (const p of itemsList) {
+        const phone = extractPhone(p.items)
+        if (phone) return phone
+      }
+      return null
+    }
+
+    for (const [dossierId, group] of dossiersMap.entries()) {
+      // Trier chronologiquement pour obtenir le plus ancien en premier
+      group.sort((a, b) => a.payment.date.localeCompare(b.payment.date))
+      
+      const reference = group[0]
+      const refPayment = reference.payment
+      const refLink = reference.link
+
+      const payer = refPayment.payer ?? refPayment.order?.payer ?? {}
+      const firstItem = refPayment.items?.[0]
+      const user = firstItem?.user ?? {}
+
+      const refAmount = refPayment.amount / 100
+      const totalAmount = refLink.is_installment ? refAmount * 3 : refAmount
+
+      dossierRows.push({
+        id:                dossierId,
+        helloasso_link_id:  refLink.id,
+        first_name:        user.firstName || payer.firstName || '',
+        last_name:         user.lastName  || payer.lastName  || '',
+        email:             user.email     || null,
+        phone:             extractPhoneFromGroup(group.map(g => g.payment)),
+        payer_first_name:  payer.firstName || '',
+        payer_last_name:   payer.lastName  || '',
+        payer_email:       payer.email     || '',
+        total_amount:      totalAmount,
+      })
+
+      for (const item of group) {
+        const p = item.payment
+        transactionRows.push({
+          helloasso_payment_id: String(p.id),
+          dossier_id:           dossierId,
+          amount:               p.amount / 100,
+          payment_date:         p.date,
+          helloasso_status:     p.state,
+          synced_at:            now,
+        })
+      }
+    }
+
+    // Upsert des dossiers par lots de 500
+    for (let i = 0; i < dossierRows.length; i += BATCH) {
+      const batch = dossierRows.slice(i, i + BATCH)
+      const { error: upsertError } = await supabase
+        .from('dossiers')
+        .upsert(batch, { onConflict: 'id' })
+
+      if (upsertError) {
+        errors.push(`Upsert dossiers batch ${Math.floor(i / BATCH) + 1}: ${upsertError.message}`)
+        console.error(`[sync-helloasso] Erreur upsert dossiers batch:`, upsertError.message)
+      }
+    }
+
+    // Upsert des transactions par lots de 500
     let synced_count = 0
     const BATCH = 500
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const batch = rows.slice(i, i + BATCH)
+    for (let i = 0; i < transactionRows.length; i += BATCH) {
+      const batch = transactionRows.slice(i, i + BATCH)
       const { error: upsertError, count } = await supabase
-        .from('registrants')
+        .from('helloasso_transactions')
         .upsert(batch, { onConflict: 'helloasso_payment_id', count: 'exact' })
 
       if (upsertError) {
-        errors.push(`Upsert batch ${Math.floor(i / BATCH) + 1}: ${upsertError.message}`)
+        errors.push(`Upsert transactions batch ${Math.floor(i / BATCH) + 1}: ${upsertError.message}`)
+        console.error(`[sync-helloasso] Erreur upsert transactions batch:`, upsertError.message)
       } else {
         synced_count += count ?? batch.length
       }

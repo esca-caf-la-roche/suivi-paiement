@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { computeDossierKey } from '../types/database'
 import type {
   Dossier,
-  Registrant,
+  HelloassoTransaction,
   HelloassoLink,
   Group,
   Responsible,
@@ -17,8 +16,8 @@ export interface UseDossiersReturn {
   loading:       boolean
   error:         string | null
   refresh:       () => Promise<void>
-  upsertStatus:  (dossierKey: string, status: PaymentStatusEnum, comment: string | null) => Promise<void>
-  resetStatus:   (dossierKey: string) => Promise<void>
+  upsertStatus:  (dossierId: string, status: PaymentStatusEnum, comment: string | null) => Promise<void>
+  resetStatus:   (dossierId: string) => Promise<void>
 }
 
 export function useDossiers(): UseDossiersReturn {
@@ -35,39 +34,34 @@ export function useDossiers(): UseDossiersReturn {
 
     try {
       const [
-        { data: registrantsRaw, error: regErr },
+        { data: dossiersRaw,    error: dosErr },
         { data: linksRaw,       error: linksErr },
         { data: groupsRaw,      error: groupsErr },
         { data: groupLinksRaw,  error: glErr },
-        { data: statusesRaw,    error: statusesErr },
         { data: responsiblesRaw, error: respErr },
       ] = await Promise.all([
-        supabase.from('registrants').select('*'),
+        supabase.from('dossiers').select('*, helloasso_transactions(*)'),
         supabase.from('helloasso_links').select('*'),
         supabase.from('groups').select('*'),
         supabase.from('group_links').select('*'),
-        supabase.from('payments_status').select('*'),
         supabase.from('responsibles').select('*'),
       ])
 
-      if (regErr)      throw regErr
+      if (dosErr)      throw dosErr
       if (linksErr)    throw linksErr
       if (groupsErr)   throw groupsErr
       if (glErr)       throw glErr
-      if (statusesErr) throw statusesErr
       if (respErr)     throw respErr
 
-      const registrants:  Registrant[]    = registrantsRaw  ?? []
+      const rawDossiers:  any[]           = dossiersRaw     ?? []
       const links:        HelloassoLink[] = linksRaw        ?? []
       const groups:       Group[]         = groupsRaw       ?? []
       const groupLinks:   any[]           = groupLinksRaw   ?? []
-      const statuses:     any[]           = statusesRaw     ?? []
       const resps:        Responsible[]   = responsiblesRaw ?? []
 
       setResponsibles(resps)
 
       const linksMap  = new Map<string, HelloassoLink>(links.map(l => [l.id, l]))
-      const statusMap = new Map<string, any>(statuses.map(s => [s.helloasso_payment_id, s]))
 
       const linkToGroups = new Map<string, string[]>()
       for (const gl of groupLinks) {
@@ -75,78 +69,53 @@ export function useDossiers(): UseDossiersReturn {
         linkToGroups.get(gl.link_id)!.push(gl.group_id)
       }
 
-      const dossierMap = new Map<string, Registrant[]>()
-      for (const reg of registrants) {
-        // Filtrer les paiements échoués ou annulés pour ne pas polluer la liste
-        if (reg.helloasso_status === 'Refused' || reg.helloasso_status === 'Canceled') {
-          continue;
-        }
-
-        const link = linksMap.get(reg.helloasso_link_id)
-        if (!link) continue
-        const groupIds = linkToGroups.get(link.id) ?? []
-        const key = computeDossierKey(reg, link.is_installment, groupIds)
-        if (!dossierMap.has(key)) dossierMap.set(key, [])
-        dossierMap.get(key)!.push(reg)
-      }
-
       const result: Dossier[] = []
 
-      for (const [dossierKey, regs] of dossierMap) {
-        regs.sort((a, b) => a.payment_date.localeCompare(b.payment_date))
+      for (const d of rawDossiers) {
+        const link = linksMap.get(d.helloasso_link_id)
+        if (!link) continue
 
-        const first = regs[0]
-        const link  = linksMap.get(first.helloasso_link_id)!
-
+        // RLS : Si le lien a un responsable assigné, et que ce n'est pas l'utilisateur connecté, on ignore
         if (link.responsible_id && link.responsible_id !== user?.id) continue
 
         const groupIds = linkToGroups.get(link.id) ?? []
         const dossierGroups = groups.filter(g => groupIds.includes(g.id))
 
-        const dossierStatuses = regs
-          .map(r => statusMap.get(r.helloasso_payment_id))
-          .filter(Boolean)
+        // Récupérer et trier chronologiquement les transactions HelloAsso
+        const transactions: HelloassoTransaction[] = d.helloasso_transactions ?? []
+        // Filtrer les éventuels statuts invalides si nécessaire, mais HelloAsso a déjà filtré Refused/Canceled lors de la sync
+        transactions.sort((a, b) => a.payment_date.localeCompare(b.payment_date))
 
-        let status:     PaymentStatusEnum | null = null
-        let comment:    string | null = null
-        let updated_by: string | null = null
-        let updated_at: string | null = null
-
-        if (dossierStatuses.length > 0) {
-          const latest = [...dossierStatuses].sort(
-            (a, b) => b.updated_at.localeCompare(a.updated_at),
-          )[0]
-          status     = latest.status
-          comment    = latest.comment ?? null
-          updated_by = latest.updated_by
-          updated_at = latest.updated_at
-        }
+        const firstPaymentDate = transactions.length > 0 ? transactions[0].payment_date : d.updated_at || new Date().toISOString()
 
         const has_status_mismatch =
-          status === 'Traité' &&
-          regs.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused')
+          d.local_status === 'Traité' &&
+          transactions.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused')
 
-        // Logique pour le suivi des remboursements
-        const isLocallyRefunded = status === 'Remboursé'
-        const isHARefunded = regs.every(r => r.helloasso_status === 'Refunded')
+        const isLocallyRefunded = d.local_status === 'Remboursé'
+        const isHARefunded = transactions.length > 0 && transactions.every(r => r.helloasso_status === 'Refunded')
         
-        // Vrai si le local dit Remboursé mais HA ne l'est pas, OU si HA est remboursé mais le local n'est pas "Remboursé"
         const needs_refund_action = (isLocallyRefunded && !isHARefunded) || (!isLocallyRefunded && isHARefunded)
 
         result.push({
-          dossier_key:        dossierKey,
+          id:                 d.id,
+          helloasso_link_id:  d.helloasso_link_id,
           is_installment:     link.is_installment,
-          payer_first_name:   first.payer_first_name,
-          payer_last_name:    first.payer_last_name,
-          payer_email:        first.payer_email,
-          first_payment_date: first.payment_date,
-          total_amount:       regs.reduce((sum, r) => sum + Number(r.amount), 0),
+          payer_first_name:   d.payer_first_name,
+          payer_last_name:    d.payer_last_name,
+          payer_email:        d.payer_email,
+          first_name:         d.first_name,
+          last_name:          d.last_name,
+          email:              d.email,
+          phone:              d.phone,
+          first_payment_date: firstPaymentDate,
+          total_amount:       Number(d.total_amount),
           groups:             dossierGroups,
-          installments:       regs,
-          status,
-          comment,
-          updated_by,
-          updated_at,
+          transactions,
+          local_status:       d.local_status,
+          comment:            d.comment,
+          updated_by:         d.updated_by,
+          updated_at:         d.updated_at,
           has_status_mismatch,
           needs_refund_action,
         })
@@ -166,71 +135,72 @@ export function useDossiers(): UseDossiersReturn {
   useEffect(() => { load() }, [load])
 
   const upsertStatus = useCallback(async (
-    dossierKey: string,
+    dossierId: string,
     status:     PaymentStatusEnum,
     comment:    string | null,
   ) => {
     if (!user?.id) throw new Error('Non authentifié')
 
-    const dossier = dossiers.find(d => d.dossier_key === dossierKey)
+    const dossier = dossiers.find(d => d.id === dossierId)
     if (!dossier) throw new Error('Dossier introuvable')
 
     const now = new Date().toISOString()
-    const rows = dossier.installments.map(reg => ({
-      helloasso_payment_id: reg.helloasso_payment_id,
-      dossier_key:          dossierKey,
-      status,
-      comment:              comment ?? null,
-      updated_by:           user.id,
-      updated_at:           now,
-    }))
+    const { error: updateErr } = await supabase
+      .from('dossiers')
+      .update({
+        local_status: status,
+        comment:      comment ?? null,
+        updated_by:   user.id,
+        updated_at:   now,
+      })
+      .eq('id', dossierId)
 
-    const { error: upsertErr } = await supabase
-      .from('payments_status')
-      .upsert(rows, { onConflict: 'helloasso_payment_id' })
-
-    if (upsertErr) throw upsertErr
+    if (updateErr) throw updateErr
 
     setDossiers(prev => prev.map(d => {
-      if (d.dossier_key !== dossierKey) return d
+      if (d.id !== dossierId) return d
       return {
         ...d,
-        status,
+        local_status: status,
         comment:    comment ?? null,
         updated_by: user.id,
         updated_at: now,
         has_status_mismatch:
           status === 'Traité' &&
-          d.installments.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused'),
+          d.transactions.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused'),
         needs_refund_action:
-          (status === 'Remboursé' && !d.installments.every(r => r.helloasso_status === 'Refunded')) ||
-          (status !== 'Remboursé' && d.installments.every(r => r.helloasso_status === 'Refunded')),
+          (status === 'Remboursé' && !d.transactions.every(r => r.helloasso_status === 'Refunded')) ||
+          (status !== 'Remboursé' && d.transactions.every(r => r.helloasso_status === 'Refunded')),
       }
     }))
   }, [dossiers, user])
 
-  const resetStatus = useCallback(async (dossierKey: string) => {
-    const dossier = dossiers.find(d => d.dossier_key === dossierKey)
+  const resetStatus = useCallback(async (dossierId: string) => {
+    const dossier = dossiers.find(d => d.id === dossierId)
     if (!dossier) throw new Error('Dossier introuvable')
 
-    const ids = dossier.installments.map(r => r.helloasso_payment_id)
-    const { error } = await supabase
-      .from('payments_status')
-      .delete()
-      .in('helloasso_payment_id', ids)
+    const { error: updateErr } = await supabase
+      .from('dossiers')
+      .update({
+        local_status: null,
+        comment:      null,
+        updated_by:   null,
+        updated_at:   new Date().toISOString(),
+      })
+      .eq('id', dossierId)
 
-    if (error) throw error
+    if (updateErr) throw updateErr
 
     setDossiers(prev => prev.map(d => {
-      if (d.dossier_key !== dossierKey) return d
+      if (d.id !== dossierId) return d
       return { 
         ...d, 
-        status: null, 
+        local_status: null, 
         comment: null, 
         updated_by: null, 
         updated_at: null, 
         has_status_mismatch: false,
-        needs_refund_action: d.installments.every(r => r.helloasso_status === 'Refunded')
+        needs_refund_action: d.transactions.every(r => r.helloasso_status === 'Refunded')
       }
     }))
   }, [dossiers])

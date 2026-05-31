@@ -144,7 +144,7 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
   }
 
   async function handleDelete(id: string, label: string) {
-    if (!window.confirm(`Supprimer le lien "${label}" ?\n\nAttention : les données associées (registrants) ne seront pas supprimées.`)) return
+    if (!window.confirm(`Supprimer le lien "${label}" ?\n\nAttention : les données associées (dossiers et transactions) ne seront pas supprimées.`)) return
     try { await onDelete(id) }
     catch (err) { alert(err instanceof Error ? err.message : String(err)) }
   }

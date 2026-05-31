@@ -47,7 +47,7 @@ function StatsBar({ dossiers }: { dossiers: Dossier[] }) {
   const counts = useMemo(() => {
     const t: Record<string, number> = { total: dossiers.length }
     for (const d of dossiers) {
-      const k = d.status ?? 'À traiter'
+      const k = d.local_status ?? 'À traiter'
       t[k] = (t[k] ?? 0) + 1
     }
     return t
@@ -93,7 +93,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
     setErr(null)
 
     // Cliquer sur le statut actif → remettre à vierge
-    if (dossier.status === status) {
+    if (dossier.local_status === status) {
       setSaving(true)
       try { await onReset() }
       catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
@@ -147,10 +147,10 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
             <span className="font-bold text-sm text-noir">
               {dossier.payer_first_name} {dossier.payer_last_name}
             </span>
-            {(dossier.installments[0].first_name !== dossier.payer_first_name ||
-              dossier.installments[0].last_name  !== dossier.payer_last_name) && (
+            {(dossier.first_name !== dossier.payer_first_name ||
+              dossier.last_name  !== dossier.payer_last_name) && (
               <span className="text-[11px] font-mono text-noir/50">
-                → {dossier.installments[0].first_name} {dossier.installments[0].last_name}
+                → {dossier.first_name} {dossier.last_name}
               </span>
             )}
           </div>
@@ -195,14 +195,14 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               disabled={saving}
               className={`
                 text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 border-2 transition-colors
-                ${dossier.status === opt.value
+                ${dossier.local_status === opt.value
                   ? statusBtnActive(opt.value)
                   : 'bg-blanc border-noir/20 text-noir/60 hover:border-noir hover:text-noir'
                 }
               `}
             >
               {opt.label}
-              {dossier.status === opt.value && ' ×'}
+              {dossier.local_status === opt.value && ' ×'}
             </button>
           ))}
         </div>
@@ -261,7 +261,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
       {dossier.needs_refund_action && (
         <div className="mt-2 bg-orange-100 border-l-4 border-orange-500 px-3 py-2">
           <p className="text-[11px] font-bold text-orange-800">
-            {dossier.status === 'Remboursé' 
+            {dossier.local_status === 'Remboursé' 
               ? '⚠ Remboursement demandé localement. À effectuer sur HelloAsso.'
               : '⚠ Remboursé sur HelloAsso. Mettre à jour le statut local.'}
           </p>
@@ -269,12 +269,12 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
       )}
 
       {/* Historique des transactions HelloAsso */}
-      {dossier.installments.length > 0 && (
+      {dossier.transactions.length > 0 && (
         <div className="mt-2 pt-1.5 border-t border-noir/10 space-y-0.5">
-          {dossier.installments.map((inst, i) => (
+          {dossier.transactions.map((inst, i) => (
             <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40">
               <span className="flex-shrink-0">
-                {dossier.is_installment ? `${i + 1}/${dossier.installments.length}` : 'Transac.'}
+                {dossier.is_installment ? `${i + 1}/${dossier.transactions.length}` : 'Transac.'}
               </span>
               <span>{formatAmount(Number(inst.amount))}</span>
               <span>{formatDateTime(inst.payment_date)}</span>
@@ -318,15 +318,14 @@ export default function ValidationPage() {
     return dossiers.filter(d => {
       if (q) {
         const hay = normalise(
-          `${d.payer_first_name} ${d.payer_last_name} ${d.payer_email} ` +
-          d.installments.map(r => `${r.first_name} ${r.last_name}`).join(' '),
+          `${d.payer_first_name} ${d.payer_last_name} ${d.payer_email} ${d.first_name} ${d.last_name}`
         )
         if (!hay.includes(q)) return false
       }
       if (filterStatus) {
         if (filterStatus === 'Suivi Remboursements') {
           if (!d.needs_refund_action) return false
-        } else if ((d.status ?? 'À traiter') !== filterStatus) {
+        } else if ((d.local_status ?? 'À traiter') !== filterStatus) {
           return false
         }
       }
@@ -468,11 +467,11 @@ export default function ValidationPage() {
 
           {!dossiersLoading && filtered.map(d => (
             <DossierCard
-              key={d.dossier_key}
+              key={d.id}
               dossier={d}
               responsibles={responsibles}
-              onSave={(status, comment) => upsertStatus(d.dossier_key, status, comment)}
-              onReset={() => resetStatus(d.dossier_key)}
+              onSave={(status, comment) => upsertStatus(d.id, status, comment)}
+              onReset={() => resetStatus(d.id)}
             />
           ))}
         </div>
