@@ -330,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               helloasso_payment_id: `refund-${refund.id}`,
               dossier_id:           dossierId,
               amount:               -(refund.amount / 100),
-              payment_date:         refund.meta?.createdAt || p.date || now, // Date officielle HelloAsso ou fallbacks
+              payment_date:         refund.meta?.createdAt || p.date, // Date de remboursement HelloAsso ou date du paiement initial
               helloasso_status:     'Refunded',
               synced_at:            now,
             })
