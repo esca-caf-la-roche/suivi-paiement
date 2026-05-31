@@ -151,13 +151,14 @@ export interface Dossier {
  * @param groupIds        La liste des IDs de groupes auxquels le lien appartient
  */
 export function computeDossierKey(
-  registrant: Pick<Registrant, 'helloasso_payment_id' | 'payer_email'>,
+  registrant: Pick<Registrant, 'helloasso_payment_id' | 'payer_email' | 'helloasso_link_id'>,
   is_installment: boolean,
   groupIds: string[]
 ): string {
-  if (is_installment && groupIds.length > 0) {
-    // Paiement 3x : regrouper par payeur + combinaison des groupes associés
-    return `${registrant.payer_email}::${[...groupIds].sort().join(',')}`
+  if (is_installment) {
+    // Paiement 3x : regrouper par payeur + combinaison des groupes associés (ou fallback sur le lien)
+    const suffix = groupIds.length > 0 ? [...groupIds].sort().join(',') : registrant.helloasso_link_id;
+    return `${registrant.payer_email}::${suffix}`
   }
   // Paiement 1x : clé unique = payment id
   return registrant.helloasso_payment_id
