@@ -246,29 +246,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    if (req.query?.debug === 'censi') {
-      const censiPayments = rawPayments.filter(item => {
-        const p = item.payment;
-        const payer = p.payer ?? p.order?.payer ?? {};
-        const firstItem = p.items?.[0] ?? {};
-        const user = firstItem.user ?? {};
-        return (
-          payer.lastName?.toLowerCase() === 'censi' ||
-          user.lastName?.toLowerCase() === 'censi'
-        );
-      });
-      return res.status(200).json({ debug: true, payments: censiPayments.map(c => c.payment) });
-    }
-
-    // Regroupement par dossier_id
-    const dossiersMap = new Map<string, Array<{ payment: HaPayment; link: any }>>()
+    // Regroupement par commande (order.id)
+    const groupsMap = new Map<string, Array<{ payment: HaPayment; link: any }>>()
     for (const item of rawPayments) {
       const p = item.payment
-      const dossierId = p.initialTransactionId ? String(p.initialTransactionId) : String(p.id)
-      if (!dossiersMap.has(dossierId)) {
-        dossiersMap.set(dossierId, [])
+      const key = p.order?.id 
+        ? String(p.order.id) 
+        : (p.initialTransactionId ? String(p.initialTransactionId) : String(p.id))
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, [])
       }
-      dossiersMap.get(dossierId)!.push(item)
+      groupsMap.get(key)!.push(item)
     }
 
     const dossierRows: DossierRow[] = []
@@ -282,13 +270,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return null
     }
 
-    for (const [dossierId, group] of dossiersMap.entries()) {
-      // Trier chronologiquement pour obtenir le plus ancien en premier
+    for (const [groupKey, group] of groupsMap.entries()) {
+      // Trier chronologiquement pour obtenir la transaction initiale en premier (référence)
       group.sort((a, b) => a.payment.date.localeCompare(b.payment.date))
       
       const reference = group[0]
       const refPayment = reference.payment
       const refLink = reference.link
+
+      // L'ID du dossier est STRICTEMENT l'ID du tout premier paiement HelloAsso de la commande
+      const dossierId = String(refPayment.id)
 
       const payer = refPayment.payer ?? refPayment.order?.payer ?? {}
       const firstItem = refPayment.items?.[0]
