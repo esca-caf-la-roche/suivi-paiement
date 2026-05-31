@@ -49,6 +49,7 @@ interface HaPayment {
   payer?: HaUser
   order?: { id?: number, payer?: HaUser }
   items?: HaItem[]
+  initialTransactionId?: number
 }
 
 interface HaResponse {
@@ -180,7 +181,9 @@ function mapPayment(payment: HaPayment, linkId: string, now: string): Registrant
 
   return {
     helloasso_payment_id: String(payment.id),
-    helloasso_order_id:   payment.order?.id ? String(payment.order.id) : null,
+    helloasso_order_id:   payment.order?.id 
+                            ? String(payment.order.id) 
+                            : (payment.initialTransactionId ? String(payment.initialTransactionId) : String(payment.id)),
     helloasso_link_id:    linkId,
     first_name:           user.firstName  || payer.firstName || '',
     last_name:            user.lastName   || payer.lastName  || '',
