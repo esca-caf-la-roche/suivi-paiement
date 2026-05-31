@@ -183,7 +183,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
           </div>
           <span className="font-mono text-[11px] text-noir/40">{formatDateTime(dossier.first_payment_date)}</span>
           {resp && dossier.updated_at && (
-            <span className="font-mono text-[10px] text-noir/30">{resp.name} · {formatDate(dossier.updated_at)}</span>
+            <span className="font-mono text-[10px] text-noir/30">{resp.name} · {formatDateTime(dossier.updated_at)}</span>
           )}
         </div>
       </div>
