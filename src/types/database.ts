@@ -60,6 +60,7 @@ export interface GroupLink {
  */
 export interface Registrant {
   helloasso_payment_id: string         // PK — identifiant unique HelloAsso
+  helloasso_order_id:   string | null  // Identifiant de commande HelloAsso (commun au paiement et remboursement)
   helloasso_link_id:    string         // uuid → helloasso_links.id
   first_name:           string         // Inscrit
   last_name:            string
@@ -153,10 +154,16 @@ export interface Dossier {
  * @param groupIds        La liste des IDs de groupes auxquels le lien appartient
  */
 export function computeDossierKey(
-  registrant: Pick<Registrant, 'helloasso_payment_id' | 'payer_email' | 'helloasso_link_id'>,
+  registrant: Pick<Registrant, 'helloasso_payment_id' | 'payer_email' | 'helloasso_link_id' | 'helloasso_order_id'>,
   is_installment: boolean,
   groupIds: string[]
 ): string {
+  // 1. Privilégier l'order_id HelloAsso s'il existe (regroupe de manière fiable 1x, 3x, et les remboursements)
+  if (registrant.helloasso_order_id) {
+    return registrant.helloasso_order_id;
+  }
+
+  // 2. Fallback sur l'ancienne logique
   if (is_installment) {
     // Paiement 3x : regrouper par payeur + combinaison des groupes associés (ou fallback sur le lien)
     const suffix = groupIds.length > 0 ? [...groupIds].sort().join(',') : registrant.helloasso_link_id;

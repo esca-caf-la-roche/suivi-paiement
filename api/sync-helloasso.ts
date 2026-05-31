@@ -47,7 +47,7 @@ interface HaPayment {
   amount: number   // centimes
   state:  string
   payer?: HaUser
-  order?: { payer?: HaUser }
+  order?: { id?: number, payer?: HaUser }
   items?: HaItem[]
 }
 
@@ -64,6 +64,7 @@ interface HaResponse {
 
 interface RegistrantRow {
   helloasso_payment_id: string
+  helloasso_order_id:   string | null
   helloasso_link_id:    string
   first_name:           string
   last_name:            string
@@ -179,6 +180,7 @@ function mapPayment(payment: HaPayment, linkId: string, now: string): Registrant
 
   return {
     helloasso_payment_id: String(payment.id),
+    helloasso_order_id:   payment.order?.id ? String(payment.order.id) : null,
     helloasso_link_id:    linkId,
     first_name:           user.firstName  || payer.firstName || '',
     last_name:            user.lastName   || payer.lastName  || '',
