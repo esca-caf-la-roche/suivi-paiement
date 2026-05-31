@@ -21,6 +21,13 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return `${dateStr} à ${timeStr}`;
+}
+
 function formatAmount(amount: number): string {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount)
 }
@@ -174,7 +181,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
             </span>
             <span className="font-mono text-sm font-bold text-noir">{formatAmount(dossier.total_amount)}</span>
           </div>
-          <span className="font-mono text-[11px] text-noir/40">{formatDate(dossier.first_payment_date)}</span>
+          <span className="font-mono text-[11px] text-noir/40">{formatDateTime(dossier.first_payment_date)}</span>
           {resp && dossier.updated_at && (
             <span className="font-mono text-[10px] text-noir/30">{resp.name} · {formatDate(dossier.updated_at)}</span>
           )}
@@ -265,18 +272,20 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
         </div>
       )}
 
-      {/* Détail 3× */}
-      {dossier.is_installment && dossier.installments.length > 1 && (
+      {/* Historique des transactions HelloAsso */}
+      {dossier.installments.length > 0 && (
         <div className="mt-2 pt-1.5 border-t border-noir/10 space-y-0.5">
           {dossier.installments.map((inst, i) => (
             <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40">
-              <span className="flex-shrink-0">{i + 1}/3</span>
+              <span className="flex-shrink-0">
+                {dossier.is_installment ? `${i + 1}/${dossier.installments.length}` : 'Transac.'}
+              </span>
               <span>{formatAmount(Number(inst.amount))}</span>
-              <span>{formatDate(inst.payment_date)}</span>
+              <span>{formatDateTime(inst.payment_date)}</span>
               <span className={
-                inst.helloasso_status === 'Authorized' ? 'text-green-600' :
-                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500' : ''
-              }>{inst.helloasso_status}</span>
+                inst.helloasso_status === 'Authorized' ? 'text-green-600 font-bold' :
+                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500 font-bold' : ''
+              }>→ {inst.helloasso_status}</span>
             </div>
           ))}
         </div>
