@@ -216,10 +216,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ synced_count: 0, errors: ['SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY manquants'] } satisfies SyncResult)
     }
 
-    // Client Supabase service_role → bypass RLS
+    // Client Supabase service_role → bypass RLS pour la verification de l'utilisateur
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     })
+
+    // Verification de l'authentification de l'appelant via son JWT
+    const authHeader = req.headers.authorization
+    if (!authHeader) {
+      return res.status(401).json({ synced_count: 0, errors: ['En-tête Authorization manquant'] } satisfies SyncResult)
+    }
+
+    const token = authHeader.split(' ')[1]
+    if (!token) {
+      return res.status(401).json({ synced_count: 0, errors: ['Token d\'authentification manquant'] } satisfies SyncResult)
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    if (userError || !user) {
+      return res.status(401).json({ synced_count: 0, errors: [`Token invalide : ${userError?.message || 'Utilisateur introuvable'}`] } satisfies SyncResult)
+    }
+
+    // Verification que l'utilisateur est un responsable configure
+    const { data: responsible, error: respError } = await supabase
+      .from('responsibles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (respError || !responsible) {
+      return res.status(403).json({ synced_count: 0, errors: ['Accès interdit : vous devez être un responsable configuré'] } satisfies SyncResult)
+    }
+
 
     // Récupération des liens configurés
     const { data: links, error: linksError } = await supabase

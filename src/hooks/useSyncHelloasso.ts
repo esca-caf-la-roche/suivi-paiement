@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useRef } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 export interface SyncResult {
   synced_count: number
@@ -31,6 +32,7 @@ export interface UseSyncHelloassoReturn {
 }
 
 export function useSyncHelloasso(): UseSyncHelloassoReturn {
+  const { session } = useAuth()
   const [result,     setResult]     = useState<SyncResult | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -46,9 +48,17 @@ export function useSyncHelloasso(): UseSyncHelloassoReturn {
     setError(null)
 
     try {
+      const token = session?.access_token
+      if (!token) {
+        throw new Error("Session de connexion expirée ou introuvable. Veuillez vous reconnecter.")
+      }
+
       const res = await fetch('/api/sync-helloasso', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body:    JSON.stringify({ force }),
       })
 
