@@ -178,12 +178,15 @@ function mapPayment(payment: HaPayment, linkId: string, now: string): Registrant
   const payer     = payment.payer ?? payment.order?.payer ?? {}
   const firstItem = payment.items?.[0]
   const user      = firstItem?.user ?? {}
+  // Pour le regroupement, l'API HelloAsso crée un NOUVEAU order.id pour un remboursement.
+  // La seule vraie constante qui relie tout le monde (remboursements ET échéances 3x) est l'initialTransactionId !
+  const groupingId = payment.initialTransactionId 
+      ? String(payment.initialTransactionId) 
+      : String(payment.id);
 
   return {
     helloasso_payment_id: String(payment.id),
-    helloasso_order_id:   payment.order?.id 
-                            ? String(payment.order.id) 
-                            : (payment.initialTransactionId ? String(payment.initialTransactionId) : String(payment.id)),
+    helloasso_order_id:   groupingId,
     helloasso_link_id:    linkId,
     first_name:           user.firstName  || payer.firstName || '',
     last_name:            user.lastName   || payer.lastName  || '',
