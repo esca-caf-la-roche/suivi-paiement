@@ -246,6 +246,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    if (req.query?.debug === 'censi') {
+      const censiPayments = rawPayments.filter(item => {
+        const p = item.payment;
+        const payer = p.payer ?? p.order?.payer ?? {};
+        const firstItem = p.items?.[0] ?? {};
+        const user = firstItem.user ?? {};
+        return (
+          payer.lastName?.toLowerCase() === 'censi' ||
+          user.lastName?.toLowerCase() === 'censi'
+        );
+      });
+      return res.status(200).json({ debug: true, payments: censiPayments.map(c => c.payment) });
+    }
+
     // Regroupement par dossier_id
     const dossiersMap = new Map<string, Array<{ payment: HaPayment; link: any }>>()
     for (const item of rawPayments) {
