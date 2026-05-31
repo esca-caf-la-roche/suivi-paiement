@@ -77,6 +77,11 @@ export function useDossiers(): UseDossiersReturn {
 
       const dossierMap = new Map<string, Registrant[]>()
       for (const reg of registrants) {
+        // Filtrer les paiements échoués ou annulés pour ne pas polluer la liste
+        if (reg.helloasso_status === 'Refused' || reg.helloasso_status === 'Canceled') {
+          continue;
+        }
+
         const link = linksMap.get(reg.helloasso_link_id)
         if (!link) continue
         const groupIds = linkToGroups.get(link.id) ?? []

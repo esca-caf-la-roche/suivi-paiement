@@ -149,7 +149,10 @@ async function fetchAllPayments(
       break
     }
     
-    all.push(...json.data)
+    // On ne garde que les paiements valides ou remboursés
+    const validPayments = json.data.filter(p => p.state !== 'Refused' && p.state !== 'Canceled')
+    all.push(...validPayments)
+    
     continuationToken = json.pagination?.continuationToken
   } while (continuationToken)
 
