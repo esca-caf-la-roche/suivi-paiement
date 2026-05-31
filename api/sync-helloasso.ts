@@ -309,7 +309,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Upsert des dossiers par lots de 500
+    // Upsert par lots de 500
+    const BATCH = 500
+    let synced_count = 0
+
+    // Upsert des dossiers
     for (let i = 0; i < dossierRows.length; i += BATCH) {
       const batch = dossierRows.slice(i, i + BATCH)
       const { error: upsertError } = await supabase
@@ -322,9 +326,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Upsert des transactions par lots de 500
-    let synced_count = 0
-    const BATCH = 500
+    // Upsert des transactions
     for (let i = 0; i < transactionRows.length; i += BATCH) {
       const batch = transactionRows.slice(i, i + BATCH)
       const { error: upsertError, count } = await supabase
