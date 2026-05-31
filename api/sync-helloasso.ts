@@ -41,6 +41,13 @@ interface HaItem {
   customFields?: HaCustomField[]
 }
 
+interface HaRefundOperation {
+  id:        number
+  amount:    number
+  amountTip: number
+  createdAt: string
+}
+
 interface HaPayment {
   id:     number
   date:   string
@@ -50,6 +57,7 @@ interface HaPayment {
   order?: { id?: number, payer?: HaUser }
   items?: HaItem[]
   initialTransactionId?: number
+  refundOperations?: HaRefundOperation[]
 }
 
 interface HaResponse {
@@ -278,8 +286,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const refPayment = reference.payment
       const refLink = reference.link
 
-      // L'ID du dossier est STRICTEMENT l'ID du tout premier paiement HelloAsso de la commande
-      const dossierId = String(refPayment.id)
+      // L'ID du dossier est STRICTEMENT l'identifiant unique de la commande (groupKey)
+      const dossierId = groupKey
 
       const payer = refPayment.payer ?? refPayment.order?.payer ?? {}
       const firstItem = refPayment.items?.[0]
@@ -311,6 +319,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           helloasso_status:     p.state,
           synced_at:            now,
         })
+
+        // Si des opérations de remboursement sont présentes, on les insère comme transactions de remboursement datées
+        if (p.refundOperations && p.refundOperations.length > 0) {
+          for (const refund of p.refundOperations) {
+            transactionRows.push({
+              helloasso_payment_id: `refund-${refund.id}`,
+              dossier_id:           dossierId,
+              amount:               -(refund.amount / 100),
+              payment_date:         refund.createdAt, // Date officielle HelloAsso
+              helloasso_status:     'Refunded',
+              synced_at:            now,
+            })
+          }
+        }
       }
     }
 

@@ -93,7 +93,9 @@ export function useDossiers(): UseDossiersReturn {
           transactions.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused')
 
         const isLocallyRefunded = d.local_status === 'Remboursé'
-        const isHARefunded = transactions.length > 0 && transactions.every(r => r.helloasso_status === 'Refunded')
+        const totalPaid = transactions.reduce((sum, t) => sum + Number(t.amount), 0)
+        const hasRefundTransaction = transactions.some(t => t.helloasso_payment_id.startsWith('refund-'))
+        const isHARefunded = transactions.length > 0 && (totalPaid <= 0 || hasRefundTransaction || transactions.every(r => r.helloasso_status === 'Refunded'))
         
         const needs_refund_action = (isLocallyRefunded && !isHARefunded) || (!isLocallyRefunded && isHARefunded)
 
@@ -168,9 +170,12 @@ export function useDossiers(): UseDossiersReturn {
         has_status_mismatch:
           status === 'Traité' &&
           d.transactions.some(r => r.helloasso_status === 'Refunded' || r.helloasso_status === 'Refused'),
-        needs_refund_action:
-          (status === 'Remboursé' && !d.transactions.every(r => r.helloasso_status === 'Refunded')) ||
-          (status !== 'Remboursé' && d.transactions.every(r => r.helloasso_status === 'Refunded')),
+        needs_refund_action: (() => {
+          const totalPaid = d.transactions.reduce((sum, t) => sum + Number(t.amount), 0)
+          const hasRefundTransaction = d.transactions.some(t => t.helloasso_payment_id.startsWith('refund-'))
+          const isHARefunded = d.transactions.length > 0 && (totalPaid <= 0 || hasRefundTransaction || d.transactions.every(r => r.helloasso_status === 'Refunded'))
+          return (status === 'Remboursé' && !isHARefunded) || (status !== 'Remboursé' && isHARefunded)
+        })(),
       }
     }))
   }, [dossiers, user])
@@ -200,7 +205,11 @@ export function useDossiers(): UseDossiersReturn {
         updated_by: null, 
         updated_at: null, 
         has_status_mismatch: false,
-        needs_refund_action: d.transactions.every(r => r.helloasso_status === 'Refunded')
+        needs_refund_action: (() => {
+          const totalPaid = d.transactions.reduce((sum, t) => sum + Number(t.amount), 0)
+          const hasRefundTransaction = d.transactions.some(t => t.helloasso_payment_id.startsWith('refund-'))
+          return d.transactions.length > 0 && (totalPaid <= 0 || hasRefundTransaction || d.transactions.every(r => r.helloasso_status === 'Refunded'))
+        })()
       }
     }))
   }, [dossiers])

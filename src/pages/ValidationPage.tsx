@@ -142,23 +142,26 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
 
       {/* ── Identité + méta ── */}
       <div className="flex items-start justify-between gap-2 mb-2.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-bold text-sm text-noir">
-              {dossier.payer_first_name} {dossier.payer_last_name}
-            </span>
-            {(dossier.first_name !== dossier.payer_first_name ||
-              dossier.last_name  !== dossier.payer_last_name) && (
-              <span className="text-[11px] font-mono text-noir/50">
-                → {dossier.first_name} {dossier.last_name}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Inscrit:</span>
+              <span className="font-bold text-sm text-noir">
+                {dossier.first_name} {dossier.last_name}
               </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Payeur:</span>
+              <span className="font-mono text-xs text-noir/60">
+                {dossier.payer_first_name} {dossier.payer_last_name}
+              </span>
+            </div>
+            {dossier.payer_email && (
+              <p className="font-mono text-[11px] text-noir/40 truncate pl-16">{dossier.payer_email}</p>
             )}
           </div>
-          {dossier.payer_email && (
-            <p className="font-mono text-[11px] text-noir/40 truncate">{dossier.payer_email}</p>
-          )}
           {dossier.groups.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-1.5">
               {dossier.groups.map(g => (
                 <span key={g.id} className="text-[10px] font-mono bg-glace/30 border border-glace px-1.5 py-0.5">
                   {g.name}
@@ -271,19 +274,36 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
       {/* Historique des transactions HelloAsso */}
       {dossier.transactions.length > 0 && (
         <div className="mt-2 pt-1.5 border-t border-noir/10 space-y-0.5">
-          {dossier.transactions.map((inst, i) => (
-            <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40">
-              <span className="flex-shrink-0">
-                {dossier.is_installment ? `${i + 1}/${dossier.transactions.length}` : 'Transac.'}
-              </span>
-              <span>{formatAmount(Number(inst.amount))}</span>
-              <span>{formatDateTime(inst.payment_date)}</span>
-              <span className={
-                inst.helloasso_status === 'Authorized' ? 'text-green-600 font-bold' :
-                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500 font-bold' : ''
-              }>→ {inst.helloasso_status}</span>
-            </div>
-          ))}
+          {dossier.transactions.map((inst) => {
+            const isRefund = inst.helloasso_payment_id.startsWith('refund-')
+            const positiveTransactions = dossier.transactions.filter(t => !t.helloasso_payment_id.startsWith('refund-'))
+            const posIndex = positiveTransactions.findIndex(t => t.helloasso_payment_id === inst.helloasso_payment_id)
+
+            const label = isRefund 
+              ? 'Remboursement' 
+              : (dossier.is_installment ? `Échéance ${posIndex + 1}/${positiveTransactions.length}` : 'Paiement')
+
+            const isSuccess = inst.helloasso_status === 'Authorized' || inst.helloasso_status === 'Processed'
+            const isRefunded = inst.helloasso_status === 'Refunded'
+
+            return (
+              <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40 flex-wrap">
+                <span className={`flex-shrink-0 w-28 ${isRefund ? 'text-red-500 font-bold' : ''}`}>
+                  {label}
+                </span>
+                <span className={isRefund ? 'text-red-500 font-bold' : ''}>
+                  {formatAmount(Number(inst.amount))}
+                </span>
+                <span>{formatDateTime(inst.payment_date)}</span>
+                <span className={
+                  isSuccess ? 'text-green-600 font-bold' :
+                  isRefunded ? 'text-red-500 font-bold' : ''
+                }>
+                  → {isSuccess ? 'Validé' : (isRefunded ? 'Remboursé' : inst.helloasso_status)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
