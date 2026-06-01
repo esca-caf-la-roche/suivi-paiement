@@ -88,6 +88,17 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
   const [comment,       setComment]       = useState('')
   const [saving,        setSaving]        = useState(false)
   const [err,           setErr]           = useState<string | null>(null)
+  const [copied,        setCopied]        = useState(false)
+
+  function handleHelloassoClick() {
+    const slug = (() => { try { return new URL(dossier.link_url).pathname.split('/')[2] } catch { return null } })()
+    const adminUrl = slug ? `https://admin.helloasso.com/${slug}/suivi-paiements` : dossier.link_url
+    window.open(adminUrl, '_blank', 'noopener,noreferrer')
+    navigator.clipboard.writeText(dossier.payer_email).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {})
+  }
 
   async function handleStatusClick(status: PaymentStatusEnum) {
     setErr(null)
@@ -208,22 +219,14 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               {dossier.local_status === opt.value && ' ×'}
             </button>
           ))}
-          <a
-            href={(() => {
-              try {
-                const slug = new URL(dossier.link_url).pathname.split('/')[2]
-                return `https://admin.helloasso.com/${slug}/suivi-paiements`
-              } catch {
-                return dossier.link_url
-              }
-            })()}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={handleHelloassoClick}
             className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 border-2 border-noir/30 text-noir/50 hover:border-noir hover:text-noir transition-colors"
-            title="Ouvrir le suivi des paiements HelloAsso pour gérer les remboursements"
+            title={`Ouvrir HelloAsso admin + copier l'email payeur (${dossier.payer_email})`}
           >
-            ↗ HelloAsso
-          </a>
+            {copied ? '✓ Email copié' : '↗ HelloAsso'}
+          </button>
         </div>
       )}
 
