@@ -209,11 +209,18 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
             </button>
           ))}
           <a
-            href={dossier.link_url}
+            href={(() => {
+              try {
+                const slug = new URL(dossier.link_url).pathname.split('/')[2]
+                return `https://admin.helloasso.com/${slug}/suivi-paiements`
+              } catch {
+                return dossier.link_url
+              }
+            })()}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 border-2 border-noir/30 text-noir/50 hover:border-noir hover:text-noir transition-colors"
-            title="Ouvrir le formulaire HelloAsso pour gérer les remboursements"
+            title="Ouvrir le suivi des paiements HelloAsso pour gérer les remboursements"
           >
             ↗ HelloAsso
           </a>
