@@ -187,9 +187,9 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
         </div>
       </div>
 
-      {/* ── Boutons de statut ── */}
+      {/* ── Boutons de statut + lien HelloAsso ── */}
       {!pendingStatus && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 items-center">
           {STATUS_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -208,6 +208,15 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               {dossier.local_status === opt.value && ' ×'}
             </button>
           ))}
+          <a
+            href={dossier.link_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-1.5 border-2 border-noir/30 text-noir/50 hover:border-noir hover:text-noir transition-colors"
+            title="Ouvrir le formulaire HelloAsso pour gérer les remboursements"
+          >
+            ↗ HelloAsso
+          </a>
         </div>
       )}
 

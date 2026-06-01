@@ -118,6 +118,7 @@ export interface SeasonReset {
 export interface Dossier {
   id:                 string            // ID unique du dossier
   helloasso_link_id:  string
+  link_url:           string            // URL du formulaire HelloAsso
   is_installment:     boolean
   payer_first_name:   string
   payer_last_name:    string
