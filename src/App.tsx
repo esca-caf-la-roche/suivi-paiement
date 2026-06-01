@@ -22,7 +22,7 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/config" replace />} />
+            <Route index element={<Navigate to="/validation" replace />} />
             <Route path="/config"     element={<ConfigPage />} />
             <Route path="/validation" element={<ValidationPage />} />
           </Route>

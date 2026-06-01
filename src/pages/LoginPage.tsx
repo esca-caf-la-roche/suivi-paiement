@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 type Step = 'email' | 'otp'
 
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
@@ -44,8 +46,10 @@ export default function LoginPage() {
     if (error) {
       console.error('verifyOtp error:', error)
       setError(`Code invalide ou expiré (${error.message}). Vérifiez le code ou recommencez.`)
+    } else {
+      // Navigation explicite — ne pas attendre onAuthStateChange
+      navigate('/validation', { replace: true })
     }
-    // Si OK, onAuthStateChange dans AuthContext met à jour la session → redirect auto
   }
 
   return (

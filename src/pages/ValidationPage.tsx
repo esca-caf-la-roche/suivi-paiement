@@ -17,8 +17,11 @@ const NEEDS_COMMENT = new Set<PaymentStatusEnum>(['En attente', 'Remboursé', 'P
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return `${dateStr} à ${timeStr}`;
 }
 
 function formatAmount(amount: number): string {
@@ -44,7 +47,7 @@ function StatsBar({ dossiers }: { dossiers: Dossier[] }) {
   const counts = useMemo(() => {
     const t: Record<string, number> = { total: dossiers.length }
     for (const d of dossiers) {
-      const k = d.status ?? 'À traiter'
+      const k = d.local_status ?? 'À traiter'
       t[k] = (t[k] ?? 0) + 1
     }
     return t
@@ -90,7 +93,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
     setErr(null)
 
     // Cliquer sur le statut actif → remettre à vierge
-    if (dossier.status === status) {
+    if (dossier.local_status === status) {
       setSaving(true)
       try { await onReset() }
       catch (e) { setErr(e instanceof Error ? e.message : String(e)) }
@@ -139,23 +142,26 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
 
       {/* ── Identité + méta ── */}
       <div className="flex items-start justify-between gap-2 mb-2.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-bold text-sm text-noir">
-              {dossier.payer_first_name} {dossier.payer_last_name}
-            </span>
-            {(dossier.installments[0].first_name !== dossier.payer_first_name ||
-              dossier.installments[0].last_name  !== dossier.payer_last_name) && (
-              <span className="text-[11px] font-mono text-noir/50">
-                → {dossier.installments[0].first_name} {dossier.installments[0].last_name}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Inscrit:</span>
+              <span className="font-bold text-sm text-noir">
+                {dossier.first_name} {dossier.last_name}
               </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Payeur:</span>
+              <span className="font-mono text-xs text-noir/60">
+                {dossier.payer_first_name} {dossier.payer_last_name}
+              </span>
+            </div>
+            {dossier.payer_email && (
+              <p className="font-mono text-[11px] text-noir/40 truncate pl-16">{dossier.payer_email}</p>
             )}
           </div>
-          {dossier.payer_email && (
-            <p className="font-mono text-[11px] text-noir/40 truncate">{dossier.payer_email}</p>
-          )}
           {dossier.groups.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-1.5">
               {dossier.groups.map(g => (
                 <span key={g.id} className="text-[10px] font-mono bg-glace/30 border border-glace px-1.5 py-0.5">
                   {g.name}
@@ -174,9 +180,9 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
             </span>
             <span className="font-mono text-sm font-bold text-noir">{formatAmount(dossier.total_amount)}</span>
           </div>
-          <span className="font-mono text-[11px] text-noir/40">{formatDate(dossier.first_payment_date)}</span>
+          <span className="font-mono text-[11px] text-noir/40">{formatDateTime(dossier.first_payment_date)}</span>
           {resp && dossier.updated_at && (
-            <span className="font-mono text-[10px] text-noir/30">{resp.name} · {formatDate(dossier.updated_at)}</span>
+            <span className="font-mono text-[10px] text-noir/30">{resp.name} · {formatDateTime(dossier.updated_at)}</span>
           )}
         </div>
       </div>
@@ -192,14 +198,14 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               disabled={saving}
               className={`
                 text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 border-2 transition-colors
-                ${dossier.status === opt.value
+                ${dossier.local_status === opt.value
                   ? statusBtnActive(opt.value)
                   : 'bg-blanc border-noir/20 text-noir/60 hover:border-noir hover:text-noir'
                 }
               `}
             >
               {opt.label}
-              {dossier.status === opt.value && ' ×'}
+              {dossier.local_status === opt.value && ' ×'}
             </button>
           ))}
         </div>
@@ -251,24 +257,79 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
 
       {err && <p className="mt-1 text-[11px] font-mono text-red-600">{err}</p>}
 
-      {dossier.has_status_mismatch && (
+      {dossier.has_status_mismatch && !dossier.needs_refund_action && (
         <p className="mt-1 text-[10px] font-bold text-red-600">⚠ HelloAsso indique un remboursement</p>
       )}
 
-      {/* Détail 3× */}
-      {dossier.is_installment && dossier.installments.length > 1 && (
+      {dossier.needs_refund_action && (
+        <div className="mt-2 bg-orange-100 border-l-4 border-orange-500 px-3 py-2">
+          <p className="text-[11px] font-bold text-orange-800">
+            {dossier.local_status === 'Remboursé' 
+              ? '⚠ Remboursement demandé localement. À effectuer sur HelloAsso.'
+              : '⚠ Remboursé sur HelloAsso. Mettre à jour le statut local.'}
+          </p>
+        </div>
+      )}
+
+      {/* Historique des transactions HelloAsso */}
+      {dossier.transactions.length > 0 && (
         <div className="mt-2 pt-1.5 border-t border-noir/10 space-y-0.5">
-          {dossier.installments.map((inst, i) => (
-            <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40">
-              <span className="flex-shrink-0">{i + 1}/3</span>
-              <span>{formatAmount(Number(inst.amount))}</span>
-              <span>{formatDate(inst.payment_date)}</span>
-              <span className={
-                inst.helloasso_status === 'Authorized' ? 'text-green-600' :
-                (inst.helloasso_status === 'Refunded' || inst.helloasso_status === 'Refused') ? 'text-red-500' : ''
-              }>{inst.helloasso_status}</span>
-            </div>
-          ))}
+          {dossier.transactions.map((inst) => {
+            const isRefund = inst.helloasso_payment_id.startsWith('refund-')
+            const positiveTransactions = dossier.transactions.filter(t => !t.helloasso_payment_id.startsWith('refund-'))
+            const posIndex = positiveTransactions.findIndex(t => t.helloasso_payment_id === inst.helloasso_payment_id)
+
+            const label = isRefund 
+              ? 'Remboursement' 
+              : (dossier.is_installment ? `Échéance ${posIndex + 1}/${positiveTransactions.length}` : 'Paiement')
+
+            const isSuccess = inst.helloasso_status === 'Authorized' || inst.helloasso_status === 'Processed'
+            const isRefunded = inst.helloasso_status === 'Refunded'
+
+            return (
+              <div key={inst.helloasso_payment_id} className="flex gap-3 text-[11px] font-mono text-noir/40 flex-wrap items-center py-0.5">
+                <span className={`flex-shrink-0 w-28 ${isRefund ? 'text-red-500 font-bold' : ''}`}>
+                  {label}
+                </span>
+                <span className={isRefund ? 'text-red-500 font-bold' : ''}>
+                  {formatAmount(Number(inst.amount))}
+                </span>
+                <span>{formatDateTime(inst.payment_date)}</span>
+                <span className={
+                  isSuccess ? 'text-green-600 font-bold' :
+                  isRefunded ? 'text-red-500 font-bold' : ''
+                }>
+                  → {isSuccess ? 'Validé' : (isRefunded ? 'Remboursé' : inst.helloasso_status)}
+                </span>
+                {(inst.payment_receipt_url || inst.fiscal_receipt_url) && (
+                  <div className="flex gap-1.5 ml-auto">
+                    {inst.payment_receipt_url && (
+                      <a
+                        href={inst.payment_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border border-noir bg-blanc hover:bg-citron hover:text-noir text-noir/70 transition-colors shadow-[1px_1px_0px_#000000] active:translate-y-px active:shadow-none flex items-center gap-1"
+                        title="Télécharger l'attestation de paiement"
+                      >
+                        📄 Attestation
+                      </a>
+                    )}
+                    {inst.fiscal_receipt_url && (
+                      <a
+                        href={inst.fiscal_receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 border border-noir bg-blanc hover:bg-citron hover:text-noir text-noir/70 transition-colors shadow-[1px_1px_0px_#000000] active:translate-y-px active:shadow-none flex items-center gap-1"
+                        title="Télécharger le reçu fiscal"
+                      >
+                        💼 Reçu Fiscal
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -303,13 +364,16 @@ export default function ValidationPage() {
     return dossiers.filter(d => {
       if (q) {
         const hay = normalise(
-          `${d.payer_first_name} ${d.payer_last_name} ${d.payer_email} ` +
-          d.installments.map(r => `${r.first_name} ${r.last_name}`).join(' '),
+          `${d.payer_first_name} ${d.payer_last_name} ${d.payer_email} ${d.first_name} ${d.last_name}`
         )
         if (!hay.includes(q)) return false
       }
       if (filterStatus) {
-        if ((d.status ?? 'À traiter') !== filterStatus) return false
+        if (filterStatus === 'Suivi Remboursements') {
+          if (!d.needs_refund_action) return false
+        } else if ((d.local_status ?? 'À traiter') !== filterStatus) {
+          return false
+        }
       }
       if (filterType === '1x' && d.is_installment)  return false
       if (filterType === '3x' && !d.is_installment) return false
@@ -382,6 +446,7 @@ export default function ValidationPage() {
           <option value="">Tous</option>
           <option value="À traiter">À traiter</option>
           {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          <option value="Suivi Remboursements">Suivi Remboursements</option>
         </select>
 
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
@@ -448,11 +513,11 @@ export default function ValidationPage() {
 
           {!dossiersLoading && filtered.map(d => (
             <DossierCard
-              key={d.dossier_key}
+              key={d.id}
               dossier={d}
               responsibles={responsibles}
-              onSave={(status, comment) => upsertStatus(d.dossier_key, status, comment)}
-              onReset={() => resetStatus(d.dossier_key)}
+              onSave={(status, comment) => upsertStatus(d.id, status, comment)}
+              onReset={() => resetStatus(d.id)}
             />
           ))}
         </div>

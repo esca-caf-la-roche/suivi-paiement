@@ -19,29 +19,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [responsible, setResponsible] = useState<Responsible | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Charge le profil responsable depuis la DB
-  async function loadResponsible(userId: string) {
-    const { data, error } = await supabase
+  // Charge le profil responsable depuis la DB (fire-and-forget, pas de await)
+  function loadResponsible(userId: string) {
+    supabase
       .from('responsibles')
       .select('*')
       .eq('id', userId)
       .single()
-    if (!error && data) setResponsible(data)
-    else setResponsible(null)
+      .then(({ data, error }) => {
+        if (!error && data) setResponsible(data)
+        else setResponsible(null)
+      })
   }
 
   useEffect(() => {
-    // Session initiale (au montage)
+    // 1. Session initiale au montage
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session?.user) {
-        loadResponsible(session.user.id).finally(() => setLoading(false))
-      } else {
-        setLoading(false)
-      }
+      if (session?.user) loadResponsible(session.user.id)
+      setLoading(false)
     })
 
-    // Écoute les changements de session (login / logout / token refresh)
+    // 2. Changements de session (login OTP, logout, refresh token)
+    // IMPORTANT : le callback doit être synchrone (pas async/await)
+    // Supabase ne supporte pas les callbacks async dans onAuthStateChange
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session)
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setResponsible(null)
         }
+        setLoading(false)
       }
     )
 

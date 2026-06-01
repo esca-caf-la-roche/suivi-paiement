@@ -27,11 +27,11 @@ AS $$
 $$;
 
 -- 4. Politiques RLS sur responsibles
---    SELECT : chaque utilisateur peut lire sa propre ligne
+--    SELECT : chaque responsable peut voir toute la liste des responsables
 CREATE POLICY "responsibles_select"
   ON public.responsibles
   FOR SELECT
-  USING (auth.uid() = id);
+  USING (public.is_responsible());
 
 --    UPDATE : chaque utilisateur peut modifier sa propre ligne
 CREATE POLICY "responsibles_update"
