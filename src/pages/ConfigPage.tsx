@@ -204,11 +204,22 @@ function LinksSection({ links, groups, loading, error, responsibles, currentUser
                   {respName && (
                     <span className="text-xs font-mono text-noir/50">👤 {respName}</span>
                   )}
-                  {linkGroups.map(g => (
-                    <span key={g.id} className="text-xs font-mono bg-noir/5 text-noir/70 px-1.5 py-0.5 rounded border border-noir/10" title={`Rattaché au groupe : ${g.name}`}>
-                      📁 {g.name}
-                    </span>
-                  ))}
+                  {linkGroups.map(g => {
+                    const isApproval = g.requires_approval
+                    return (
+                      <span
+                        key={g.id}
+                        className={`text-xs font-mono px-1.5 py-0.5 rounded border ${
+                          isApproval
+                            ? 'bg-glace/30 text-noir border-glace'
+                            : 'bg-noir/5 text-noir/70 border-noir/10'
+                        }`}
+                        title={isApproval ? `Rattaché au groupe (Sous approbation) : ${g.name}` : `Rattaché au groupe : ${g.name}`}
+                      >
+                        📁 {g.name}
+                      </span>
+                    )
+                  })}
                 </div>
                 <p className="mt-0.5 font-mono text-xs text-noir/50 truncate" title={link.url}>{truncateUrl(link.url)}</p>
               </div>
