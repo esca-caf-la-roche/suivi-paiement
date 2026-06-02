@@ -69,6 +69,18 @@ export default function Layout() {
             >
               Approbations
             </NavLink>
+            <NavLink
+              to="/attente"
+              className={({ isActive }) =>
+                `text-xs font-bold uppercase tracking-widest px-3 py-1.5 border-2 transition-colors ${
+                  isActive
+                    ? 'bg-noir text-blanc border-noir'
+                    : 'border-transparent text-noir hover:border-noir'
+                }`
+              }
+            >
+              Attente
+            </NavLink>
           </nav>
 
           {/* Spacer */}

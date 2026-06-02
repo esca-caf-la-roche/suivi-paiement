@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useDossiers } from '../hooks/useDossiers'
 import { useSyncHelloasso } from '../hooks/useSyncHelloasso'
 import { useApprovedStudents } from '../hooks/useApprovedStudents'
-import type { Dossier, PaymentStatusEnum, Responsible, ApprovedStudent } from '../types/database'
+import { useWaitingStudents } from '../hooks/useWaitingStudents'
+import type { Dossier, PaymentStatusEnum, Responsible, ApprovedStudent, WaitingStudent } from '../types/database'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -81,11 +82,12 @@ interface DossierCardProps {
   dossier:          Dossier
   responsibles:     Responsible[]
   approvedStudents: ApprovedStudent[]
+  waitingStudents:  WaitingStudent[]
   onSave:           (status: PaymentStatusEnum, comment: string | null) => Promise<void>
   onReset:          () => Promise<void>
 }
 
-function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset }: DossierCardProps) {
+function DossierCard({ dossier, responsibles, approvedStudents, waitingStudents, onSave, onReset }: DossierCardProps) {
   const [pendingStatus, setPendingStatus] = useState<PaymentStatusEnum | null>(null)
   const [comment,       setComment]       = useState('')
   const [saving,        setSaving]        = useState(false)
@@ -163,6 +165,14 @@ function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset 
     })
   }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
 
+  const matchingWaitingStudents = useMemo(() => {
+    const emailsToMatch = new Set([
+      dossier.payer_email.toLowerCase(),
+      ...(dossier.email ? [dossier.email.toLowerCase()] : [])
+    ])
+    return waitingStudents.filter(s => emailsToMatch.has(s.email.toLowerCase()))
+  }, [waitingStudents, dossier.payer_email, dossier.email])
+
   return (
     <div className={`border-b-2 border-noir/10 px-4 py-3 transition-opacity ${saving ? 'opacity-60' : ''}`}>
 
@@ -194,6 +204,14 @@ function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset 
             </div>
             {dossier.payer_email && (
               <p className="font-mono text-[11px] text-noir/40 truncate pl-16">{dossier.payer_email}</p>
+            )}
+            {matchingWaitingStudents.length > 0 && (
+              <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Attente:</span>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-1.5 py-0.5 shadow-[1px_1px_0px_#ea580c]" title="Élève sur liste d'attente générale">
+                  ⏳ {matchingWaitingStudents.map(s => `${s.first_name} ${s.last_name}`).join(', ')}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -377,6 +395,7 @@ export default function ValidationPage() {
   const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus, resetStatus } = useDossiers()
   const { loading: syncLoading, error: syncError, result: syncResult, lastSyncAt, sync } = useSyncHelloasso()
   const { approvedStudents } = useApprovedStudents()
+  const { waitingStudents } = useWaitingStudents()
 
   useEffect(() => { sync() }, [sync]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -553,6 +572,7 @@ export default function ValidationPage() {
               dossier={d}
               responsibles={responsibles}
               approvedStudents={approvedStudents}
+              waitingStudents={waitingStudents}
               onSave={(status, comment) => upsertStatus(d.id, status, comment)}
               onReset={() => resetStatus(d.id)}
             />

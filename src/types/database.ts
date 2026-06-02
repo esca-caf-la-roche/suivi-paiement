@@ -63,6 +63,15 @@ export interface ApprovedStudent {
   created_at?: string
 }
 
+/** Table : waiting_students */
+export interface WaitingStudent {
+  id:         string   // uuid
+  first_name: string
+  last_name:  string
+  email:      string
+  created_at?: string
+}
+
 
 /**
  * Table : registrants
