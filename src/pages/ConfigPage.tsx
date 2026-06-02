@@ -56,6 +56,7 @@ export default function ConfigPage() {
 
       <LinksSection
         links={links}
+        groups={groups}
         loading={linksLoading}
         error={linksError}
         responsibles={responsibles}
@@ -84,6 +85,7 @@ export default function ConfigPage() {
 
 interface LinksSectionProps {
   links:         HelloassoLink[]
+  groups:        Group[]
   loading:       boolean
   error:         string | null
   responsibles:  Responsible[]
@@ -93,7 +95,7 @@ interface LinksSectionProps {
   onDelete:      (id: string) => Promise<void>
 }
 
-function LinksSection({ links, loading, error, responsibles, currentUserId, onAdd, onUpdate, onDelete }: LinksSectionProps) {
+function LinksSection({ links, groups, loading, error, responsibles, currentUserId, onAdd, onUpdate, onDelete }: LinksSectionProps) {
   const [showForm, setShowForm]   = useState(false)
   const [editId, setEditId]       = useState<string | null>(null)
   const [form, setForm]           = useState<NewHelloassoLink>(makeEmptyLink(currentUserId))
@@ -182,6 +184,7 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
 
         {sortedLinks.map(link => {
           const respName    = responsibles.find(r => r.id === link.responsible_id)?.name
+          const linkGroups  = groups.filter(g => g.link_ids?.includes(link.id))
 
           return (
             <div
@@ -201,6 +204,11 @@ function LinksSection({ links, loading, error, responsibles, currentUserId, onAd
                   {respName && (
                     <span className="text-xs font-mono text-noir/50">👤 {respName}</span>
                   )}
+                  {linkGroups.map(g => (
+                    <span key={g.id} className="text-xs font-mono bg-noir/5 text-noir/70 px-1.5 py-0.5 rounded border border-noir/10" title={`Rattaché au groupe : ${g.name}`}>
+                      📁 {g.name}
+                    </span>
+                  ))}
                 </div>
                 <p className="mt-0.5 font-mono text-xs text-noir/50 truncate" title={link.url}>{truncateUrl(link.url)}</p>
               </div>
