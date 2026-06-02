@@ -41,9 +41,10 @@ export interface HelloassoLink {
 
 /** Table : groups */
 export interface Group {
-  id:       string   // uuid
-  name:     string   // "5-6 ans", "Primaires (débutants)", etc.
-  link_ids?: string[]
+  id:                string   // uuid
+  name:              string   // "5-6 ans", "Primaires (débutants)", etc.
+  requires_approval: boolean
+  link_ids?:         string[]
 }
 
 /** Table de liaison : group_links */

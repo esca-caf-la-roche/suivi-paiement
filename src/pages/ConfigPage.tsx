@@ -18,7 +18,7 @@ function makeEmptyLink(defaultResponsibleId: string): NewHelloassoLink {
   }
 }
 
-const EMPTY_GROUP: NewGroup = { name: '', link_ids: [] }
+const EMPTY_GROUP: NewGroup = { name: '', requires_approval: false, link_ids: [] }
 
 function truncateUrl(url: string, max = 55): string {
   if (url.length <= max) return url
@@ -307,7 +307,7 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
   const [formError, setFormError] = useState<string | null>(null)
 
   function openAdd() { setEditId(null); setForm(EMPTY_GROUP); setFormError(null); setShowForm(true) }
-  function openEdit(group: Group) { setEditId(group.id); setForm({ name: group.name, link_ids: group.link_ids ?? [] }); setFormError(null); setShowForm(true) }
+  function openEdit(group: Group) { setEditId(group.id); setForm({ name: group.name, requires_approval: group.requires_approval, link_ids: group.link_ids ?? [] }); setFormError(null); setShowForm(true) }
   function cancelForm() { setShowForm(false); setEditId(null); setForm(EMPTY_GROUP); setFormError(null) }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -355,7 +355,14 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
             return (
               <div key={group.id} className="border-b-2 border-noir/10 px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-noir/[0.02]">
                 <div className="flex-1 min-w-0">
-                  <span className="font-bold text-sm text-noir">{group.name}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-noir">{group.name}</span>
+                    {group.requires_approval && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-glace/40 border border-glace text-noir px-1.5 py-0.5 rounded">
+                        Appro. moniteur
+                      </span>
+                    )}
+                  </div>
                   {groupLinks.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-2">
                       {groupLinks.map(l => (
@@ -383,6 +390,18 @@ function GroupsSection({ groups, links, loading, error, onAdd, onUpdate, onDelet
               <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder='ex: "5-6 ans", "Primaires (débutants)"'
                 className="w-full border-2 border-noir px-3 py-2 text-sm font-mono bg-blanc focus:outline-none focus:bg-citron/20" />
+            </div>
+
+            <div className="flex items-center gap-2 py-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.requires_approval}
+                  onChange={e => setForm(f => ({ ...f, requires_approval: e.target.checked }))}
+                  className="accent-noir w-4 h-4"
+                />
+                <span className="text-sm font-medium text-noir select-none">Sous approbation du moniteur</span>
+              </label>
             </div>
 
             <div className="space-y-2">

@@ -9,8 +9,9 @@ import { supabase } from '../lib/supabase'
 import type { Group } from '../types/database'
 
 export interface NewGroup {
-  name:     string
-  link_ids: string[]
+  name:              string
+  requires_approval: boolean
+  link_ids:          string[]
 }
 
 export interface UseGroupsReturn {
@@ -48,6 +49,7 @@ export function useGroups(): UseGroupsReturn {
           const mapped = (data ?? []).map((row: any) => ({
             id: row.id,
             name: row.name,
+            requires_approval: row.requires_approval,
             link_ids: row.group_links?.map((gl: any) => gl.link_id) ?? []
           }))
           setGroups(mapped)
@@ -61,7 +63,7 @@ export function useGroups(): UseGroupsReturn {
   const addGroup = useCallback(async (data: NewGroup) => {
     const { data: newGroup, error } = await supabase
       .from('groups')
-      .insert({ name: data.name })
+      .insert({ name: data.name, requires_approval: data.requires_approval })
       .select()
       .single()
     if (error) throw new Error(error.message)
@@ -76,10 +78,14 @@ export function useGroups(): UseGroupsReturn {
   }, [refresh])
 
   const updateGroup = useCallback(async (id: string, data: Partial<NewGroup>) => {
-    if (data.name !== undefined) {
+    const updates: any = {}
+    if (data.name !== undefined) updates.name = data.name
+    if (data.requires_approval !== undefined) updates.requires_approval = data.requires_approval
+
+    if (Object.keys(updates).length > 0) {
       const { error } = await supabase
         .from('groups')
-        .update({ name: data.name })
+        .update(updates)
         .eq('id', id)
       if (error) throw new Error(error.message)
     }
