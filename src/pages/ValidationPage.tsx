@@ -165,6 +165,15 @@ function DossierCard({ dossier, responsibles, approvedStudents, waitingStudents,
     })
   }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
 
+  const matchingApprovedStudents = useMemo(() => {
+    if (!hasApprovalGroup) return []
+    return approvedStudents.filter(s =>
+      approvalGroups.some(g => g.id === s.group_id) &&
+      (s.email.toLowerCase() === dossier.payer_email.toLowerCase() ||
+       (dossier.email && s.email.toLowerCase() === dossier.email.toLowerCase()))
+    )
+  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
+
   const matchingWaitingStudents = useMemo(() => {
     const emailsToMatch = new Set([
       dossier.payer_email.toLowerCase(),
@@ -196,6 +205,14 @@ function DossierCard({ dossier, responsibles, approvedStudents, waitingStudents,
                 )}
               </span>
             </div>
+            {matchingApprovedStudents.length > 0 && (
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Approuvé:</span>
+                <span className="font-bold text-xs text-green-600">
+                  {matchingApprovedStudents.map(s => `${s.first_name} ${s.last_name}`).join(', ')}
+                </span>
+              </div>
+            )}
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Payeur:</span>
               <span className="font-mono text-xs text-noir/60">
