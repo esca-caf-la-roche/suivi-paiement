@@ -57,6 +57,18 @@ export default function Layout() {
             >
               Validation
             </NavLink>
+            <NavLink
+              to="/approbations"
+              className={({ isActive }) =>
+                `text-xs font-bold uppercase tracking-widest px-3 py-1.5 border-2 transition-colors ${
+                  isActive
+                    ? 'bg-noir text-blanc border-noir'
+                    : 'border-transparent text-noir hover:border-noir'
+                }`
+              }
+            >
+              Approbations
+            </NavLink>
           </nav>
 
           {/* Spacer */}

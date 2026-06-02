@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useDossiers } from '../hooks/useDossiers'
 import { useSyncHelloasso } from '../hooks/useSyncHelloasso'
-import type { Dossier, PaymentStatusEnum, Responsible } from '../types/database'
+import { useApprovedStudents } from '../hooks/useApprovedStudents'
+import type { Dossier, PaymentStatusEnum, Responsible, ApprovedStudent } from '../types/database'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -77,13 +78,14 @@ function StatsBar({ dossiers }: { dossiers: Dossier[] }) {
 // ─── Carte de dossier ─────────────────────────────────────────────────────────
 
 interface DossierCardProps {
-  dossier:      Dossier
-  responsibles: Responsible[]
-  onSave:       (status: PaymentStatusEnum, comment: string | null) => Promise<void>
-  onReset:      () => Promise<void>
+  dossier:          Dossier
+  responsibles:     Responsible[]
+  approvedStudents: ApprovedStudent[]
+  onSave:           (status: PaymentStatusEnum, comment: string | null) => Promise<void>
+  onReset:          () => Promise<void>
 }
 
-function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProps) {
+function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset }: DossierCardProps) {
   const [pendingStatus, setPendingStatus] = useState<PaymentStatusEnum | null>(null)
   const [comment,       setComment]       = useState('')
   const [saving,        setSaving]        = useState(false)
@@ -146,7 +148,19 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
     setErr(null)
   }
 
-  const resp = responsibles.find(r => r.id === dossier.updated_by)
+  const approvalGroups = useMemo(() => dossier.groups.filter(g => g.requires_approval), [dossier.groups])
+  const hasApprovalGroup = approvalGroups.length > 0
+
+  const isApproved = useMemo(() => {
+    if (!hasApprovalGroup) return false
+    return approvalGroups.every(g => {
+      return approvedStudents.some(s => 
+        s.group_id === g.id && 
+        (s.email.toLowerCase() === dossier.payer_email.toLowerCase() || 
+         (dossier.email && s.email.toLowerCase() === dossier.email.toLowerCase()))
+      )
+    })
+  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
 
   return (
     <div className={`border-b-2 border-noir/10 px-4 py-3 transition-opacity ${saving ? 'opacity-60' : ''}`}>
@@ -159,8 +173,15 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Inscrit:</span>
               <span className="font-bold text-sm text-noir inline-flex items-center gap-1">
                 {dossier.first_name} {dossier.last_name}
-                {dossier.groups.some(g => g.requires_approval) && (
-                  <span className="text-xs text-noir/60" title="Groupe sous approbation du moniteur">🔒</span>
+                {hasApprovalGroup && (
+                  <span className="inline-flex items-center gap-0.5 text-xs" title="Groupe sous approbation du moniteur">
+                    <span>🔒</span>
+                    {isApproved ? (
+                      <span className="text-green-600 font-bold" title="Élève approuvé">✓</span>
+                    ) : (
+                      <span className="text-red-500 font-bold" title="Élève non approuvé ou e-mail incorrect">✗</span>
+                    )}
+                  </span>
                 )}
               </span>
             </div>
@@ -354,6 +375,7 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
 export default function ValidationPage() {
   const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus, resetStatus } = useDossiers()
   const { loading: syncLoading, error: syncError, result: syncResult, lastSyncAt, sync } = useSyncHelloasso()
+  const { approvedStudents, loading: approvedStudentsLoading } = useApprovedStudents()
 
   useEffect(() => { sync() }, [sync]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -529,6 +551,7 @@ export default function ValidationPage() {
               key={d.id}
               dossier={d}
               responsibles={responsibles}
+              approvedStudents={approvedStudents}
               onSave={(status, comment) => upsertStatus(d.id, status, comment)}
               onReset={() => resetStatus(d.id)}
             />

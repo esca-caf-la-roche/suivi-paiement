@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import ConfigPage from './pages/ConfigPage'
 import ValidationPage from './pages/ValidationPage'
+import ApprovedStudentsPage from './pages/ApprovedStudentsPage'
 
 export default function App() {
   return (
@@ -23,8 +24,9 @@ export default function App() {
             }
           >
             <Route index element={<Navigate to="/validation" replace />} />
-            <Route path="/config"     element={<ConfigPage />} />
-            <Route path="/validation" element={<ValidationPage />} />
+            <Route path="/config"       element={<ConfigPage />} />
+            <Route path="/validation"   element={<ValidationPage />} />
+            <Route path="/approbations" element={<ApprovedStudentsPage />} />
           </Route>
 
           {/* Fallback */}

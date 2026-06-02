@@ -53,6 +53,17 @@ export interface GroupLink {
   link_id:  string // uuid → helloasso_links.id
 }
 
+/** Table : approved_students */
+export interface ApprovedStudent {
+  id:         string   // uuid
+  first_name: string
+  last_name:  string
+  email:      string
+  group_id:   string   // uuid → groups.id
+  created_at?: string
+}
+
+
 /**
  * Table : registrants
  *
