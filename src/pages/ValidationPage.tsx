@@ -148,6 +148,7 @@ function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset 
     setErr(null)
   }
 
+  const resp = responsibles.find(r => r.id === dossier.updated_by)
   const approvalGroups = useMemo(() => dossier.groups.filter(g => g.requires_approval), [dossier.groups])
   const hasApprovalGroup = approvalGroups.length > 0
 
@@ -375,7 +376,7 @@ function DossierCard({ dossier, responsibles, approvedStudents, onSave, onReset 
 export default function ValidationPage() {
   const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus, resetStatus } = useDossiers()
   const { loading: syncLoading, error: syncError, result: syncResult, lastSyncAt, sync } = useSyncHelloasso()
-  const { approvedStudents, loading: approvedStudentsLoading } = useApprovedStudents()
+  const { approvedStudents } = useApprovedStudents()
 
   useEffect(() => { sync() }, [sync]) // eslint-disable-line react-hooks/exhaustive-deps
 
