@@ -157,8 +157,11 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
           <div className="flex flex-col gap-0.5">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-[10px] font-mono uppercase tracking-wider text-noir/40 flex-shrink-0 w-14">Inscrit:</span>
-              <span className="font-bold text-sm text-noir">
+              <span className="font-bold text-sm text-noir inline-flex items-center gap-1">
                 {dossier.first_name} {dossier.last_name}
+                {dossier.groups.some(g => g.requires_approval) && (
+                  <span className="text-xs text-noir/60" title="Groupe sous approbation du moniteur">🔒</span>
+                )}
               </span>
             </div>
             <div className="flex items-baseline gap-1.5 flex-wrap">
@@ -171,15 +174,6 @@ function DossierCard({ dossier, responsibles, onSave, onReset }: DossierCardProp
               <p className="font-mono text-[11px] text-noir/40 truncate pl-16">{dossier.payer_email}</p>
             )}
           </div>
-          {dossier.groups.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {dossier.groups.map(g => (
-                <span key={g.id} className="text-[10px] font-mono bg-glace/30 border border-glace px-1.5 py-0.5">
-                  {g.name}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col items-end gap-0.5 flex-shrink-0 text-right">
