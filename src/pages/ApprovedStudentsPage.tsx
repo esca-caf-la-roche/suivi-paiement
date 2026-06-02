@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react'
 import { useApprovedStudents } from '../hooks/useApprovedStudents'
 import { useGroups } from '../hooks/useGroups'
+import { useDossiers } from '../hooks/useDossiers'
 
 export default function ApprovedStudentsPage() {
   const { approvedStudents, loading: studentsLoading, error: studentsError, addApprovedStudent, deleteApprovedStudent } = useApprovedStudents()
   const { groups, loading: groupsLoading, error: groupsError } = useGroups()
+  const { dossiers } = useDossiers()
 
   // Formulaire d'ajout
   const [firstName, setFirstName] = useState('')
@@ -221,24 +223,40 @@ export default function ApprovedStudentsPage() {
                       Aucun élève approuvé dans ce groupe pour le moment.
                     </p>
                   ) : (
-                    groupStudents.map(student => (
-                      <div key={student.id} className="p-3 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-noir">
-                            {student.first_name} {student.last_name}
-                          </p>
-                          <p className="font-mono text-xs text-noir/50 truncate">
-                            {student.email}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(student.id)}
-                          className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 border border-red-500 text-red-500 bg-blanc hover:bg-red-50 transition-colors"
+                    groupStudents.map(student => {
+                      const isProcessed = dossiers.some(dossier => {
+                        if (dossier.local_status !== 'Traité') return false
+                        const matchesGroup = dossier.groups.some(g => g.id === student.group_id)
+                        if (!matchesGroup) return false
+                        const studentEmail = student.email.toLowerCase()
+                        return dossier.payer_email.toLowerCase() === studentEmail || 
+                          (dossier.email && dossier.email.toLowerCase() === studentEmail)
+                      })
+
+                      return (
+                        <div 
+                          key={student.id} 
+                          className={`p-3 flex items-center justify-between gap-4 transition-colors ${
+                            isProcessed ? 'bg-green-100/60' : ''
+                          }`}
                         >
-                          Retirer
-                        </button>
-                      </div>
-                    ))
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-noir">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="font-mono text-xs text-noir/50 truncate">
+                              {student.email}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleDelete(student.id)}
+                            className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 border border-red-500 text-red-500 bg-blanc hover:bg-red-50 transition-colors"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </section>
