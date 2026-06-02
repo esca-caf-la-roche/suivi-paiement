@@ -4,7 +4,7 @@ import { useGroups } from '../hooks/useGroups'
 import { useDossiers } from '../hooks/useDossiers'
 
 export default function ApprovedStudentsPage() {
-  const { approvedStudents, loading: studentsLoading, error: studentsError, addApprovedStudent, deleteApprovedStudent } = useApprovedStudents()
+  const { approvedStudents, loading: studentsLoading, error: studentsError, addApprovedStudent, updateApprovedStudent, deleteApprovedStudent } = useApprovedStudents()
   const { groups, loading: groupsLoading, error: groupsError } = useGroups()
   const { dossiers } = useDossiers()
 
@@ -15,6 +15,13 @@ export default function ApprovedStudentsPage() {
   const [groupId,   setGroupId]   = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // États de modification
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
+  const [editFirstName, setEditFirstName] = useState('')
+  const [editLastName,  setEditLastName]  = useState('')
+  const [editEmail,     setEditEmail]     = useState('')
+  const [editGroupId,   setEditGroupId]   = useState('')
 
   // Filtrer les groupes qui requièrent une approbation
   const approvalGroups = useMemo(() => {
@@ -61,6 +68,41 @@ export default function ApprovedStudentsPage() {
       setSubmitError(err instanceof Error ? err.message : String(err))
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function handleStartEdit(student: any) {
+    setEditingStudentId(student.id)
+    setEditFirstName(student.first_name)
+    setEditLastName(student.last_name)
+    setEditEmail(student.email)
+    setEditGroupId(student.group_id)
+  }
+
+  function handleCancelEdit() {
+    setEditingStudentId(null)
+    setEditFirstName('')
+    setEditLastName('')
+    setEditEmail('')
+    setEditGroupId('')
+  }
+
+  async function handleSaveEdit(id: string) {
+    if (!editFirstName.trim() || !editLastName.trim() || !editEmail.trim() || !editGroupId) {
+      alert('Veuillez remplir tous les champs.')
+      return
+    }
+
+    try {
+      await updateApprovedStudent(id, {
+        first_name: editFirstName.trim(),
+        last_name:  editLastName.trim(),
+        email:      editEmail.trim(),
+        group_id:   editGroupId
+      })
+      handleCancelEdit()
+    } catch (err) {
+      alert(`Erreur lors de la modification : ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -233,6 +275,63 @@ export default function ApprovedStudentsPage() {
                           (dossier.email && dossier.email.toLowerCase() === studentEmail)
                       })
 
+                      const isEditing = editingStudentId === student.id
+
+                      if (isEditing) {
+                        return (
+                          <div key={student.id} className="p-3 bg-citron/10 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={editFirstName}
+                                onChange={e => setEditFirstName(e.target.value)}
+                                className="border-2 border-noir px-2 py-1 text-xs font-mono bg-blanc"
+                                placeholder="Prénom"
+                              />
+                              <input
+                                type="text"
+                                value={editLastName}
+                                onChange={e => setEditLastName(e.target.value)}
+                                className="border-2 border-noir px-2 py-1 text-xs font-mono bg-blanc"
+                                placeholder="Nom"
+                              />
+                            </div>
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={e => setEditEmail(e.target.value)}
+                              className="w-full border-2 border-noir px-2 py-1 text-xs font-mono bg-blanc"
+                              placeholder="Email"
+                            />
+                            <select
+                              value={editGroupId}
+                              onChange={e => setEditGroupId(e.target.value)}
+                              className="w-full border-2 border-noir px-1.5 py-1 text-xs font-mono bg-blanc focus:outline-none"
+                            >
+                              {approvalGroups.map(g => (
+                                <option key={g.id} value={g.id}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleSaveEdit(student.id)}
+                                className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 bg-noir text-blanc border-2 border-noir hover:bg-blanc hover:text-noir transition-colors font-bold"
+                              >
+                                Enregistrer
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 border-2 border-noir/30 text-noir hover:border-noir transition-colors"
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
                       return (
                         <div 
                           key={student.id} 
@@ -248,12 +347,20 @@ export default function ApprovedStudentsPage() {
                               {student.email}
                             </p>
                           </div>
-                          <button
-                            onClick={() => handleDelete(student.id)}
-                            className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 border border-red-500 text-red-500 bg-blanc hover:bg-red-50 transition-colors"
-                          >
-                            Retirer
-                          </button>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => handleStartEdit(student)}
+                              className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 border border-noir text-noir bg-blanc hover:bg-noir hover:text-blanc transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleDelete(student.id)}
+                              className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1.5 border border-red-500 text-red-500 bg-blanc hover:bg-red-50 transition-colors"
+                            >
+                              Retirer
+                            </button>
+                          </div>
                         </div>
                       )
                     })

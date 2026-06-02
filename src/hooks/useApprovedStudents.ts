@@ -7,6 +7,7 @@ export interface UseApprovedStudentsReturn {
   loading:               boolean
   error:                 string | null
   addApprovedStudent:    (data: Omit<ApprovedStudent, 'id' | 'created_at'>) => Promise<void>
+  updateApprovedStudent: (id: string, data: Omit<ApprovedStudent, 'id' | 'created_at'>) => Promise<void>
   deleteApprovedStudent: (id: string) => Promise<void>
   refresh:               () => void
 }
@@ -55,6 +56,20 @@ export function useApprovedStudents(): UseApprovedStudentsReturn {
     refresh()
   }, [refresh])
 
+  const updateApprovedStudent = useCallback(async (id: string, data: Omit<ApprovedStudent, 'id' | 'created_at'>) => {
+    const { error } = await supabase
+      .from('approved_students')
+      .update({
+        first_name: data.first_name,
+        last_name:  data.last_name,
+        email:      data.email.trim(),
+        group_id:   data.group_id
+      })
+      .eq('id', id)
+    if (error) throw new Error(error.message)
+    refresh()
+  }, [refresh])
+
   const deleteApprovedStudent = useCallback(async (id: string) => {
     const { error } = await supabase
       .from('approved_students')
@@ -64,5 +79,5 @@ export function useApprovedStudents(): UseApprovedStudentsReturn {
     refresh()
   }, [refresh])
 
-  return { approvedStudents, loading, error, addApprovedStudent, deleteApprovedStudent, refresh }
+  return { approvedStudents, loading, error, addApprovedStudent, updateApprovedStudent, deleteApprovedStudent, refresh }
 }
