@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { useDossiers } from '../hooks/useDossiers'
 import { useSyncHelloasso } from '../hooks/useSyncHelloasso'
 import { useApprovedStudents } from '../hooks/useApprovedStudents'
@@ -72,6 +73,78 @@ function StatsBar({ dossiers }: { dossiers: Dossier[] }) {
           <span className="text-noir/40 text-[10px] uppercase tracking-widest">{it.label}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Stats par responsable ───────────────────────────────────────────────────
+
+function StatsByResponsible({ dossiers, responsibles }: { dossiers: Dossier[]; responsibles: Responsible[] }) {
+  const stats = useMemo(() => {
+    const map = new Map<string | null, Record<string, number>>()
+
+    for (const r of responsibles) {
+      map.set(r.id, { total: 0, 'À traiter': 0, 'En attente': 0, 'Traité': 0, 'Problème': 0, 'Remboursé': 0 })
+    }
+    map.set(null, { total: 0, 'À traiter': 0, 'En attente': 0, 'Traité': 0, 'Problème': 0, 'Remboursé': 0 })
+
+    for (const d of dossiers) {
+      const respId = d.responsible_id || null
+      let row = map.get(respId)
+      if (!row) {
+        row = { total: 0, 'À traiter': 0, 'En attente': 0, 'Traité': 0, 'Problème': 0, 'Remboursé': 0 }
+        map.set(respId, row)
+      }
+      row.total++
+      const k = d.local_status ?? 'À traiter'
+      row[k] = (row[k] ?? 0) + 1
+    }
+
+    const rows = responsibles.map(r => ({
+      name: r.name,
+      stats: map.get(r.id)!,
+    })).sort((a, b) => a.name.localeCompare(b.name))
+
+    const noRespStats = map.get(null)
+    if (noRespStats && noRespStats.total > 0) {
+      rows.push({
+        name: 'Sans responsable',
+        stats: noRespStats,
+      })
+    }
+
+    return rows
+  }, [dossiers, responsibles])
+
+  return (
+    <div className="border-4 border-noir bg-blanc p-4 shadow-[4px_4px_0px_#000000] overflow-x-auto">
+      <h3 className="text-xs font-black uppercase tracking-widest text-noir mb-3">Statistiques par responsable</h3>
+      <table className="w-full text-left font-mono text-xs border-collapse">
+        <thead>
+          <tr className="border-b-2 border-noir uppercase tracking-wider text-[9px] text-noir/50">
+            <th className="py-2 pr-4 font-bold">Responsable</th>
+            <th className="py-2 px-2 text-right font-bold text-noir">Total</th>
+            <th className="py-2 px-2 text-right font-bold text-noir/60">À traiter</th>
+            <th className="py-2 px-2 text-right font-bold text-citron">En attente</th>
+            <th className="py-2 px-2 text-right font-bold text-green-600">Traité</th>
+            <th className="py-2 px-2 text-right font-bold text-red-600">Problème</th>
+            <th className="py-2 px-2 text-right font-bold text-glace">Remboursé</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stats.map(row => (
+            <tr key={row.name} className="border-b border-noir/10 hover:bg-noir/[0.02]">
+              <td className="py-2 pr-4 font-bold text-noir">{row.name}</td>
+              <td className="py-2 px-2 text-right font-bold text-noir">{row.stats.total}</td>
+              <td className="py-2 px-2 text-right text-noir/60">{row.stats['À traiter']}</td>
+              <td className="py-2 px-2 text-right text-citron font-bold">{row.stats['En attente']}</td>
+              <td className="py-2 px-2 text-right text-green-600 font-bold">{row.stats['Traité']}</td>
+              <td className="py-2 px-2 text-right text-red-600 font-bold">{row.stats['Problème']}</td>
+              <td className="py-2 px-2 text-right text-glace font-bold">{row.stats['Remboursé']}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -409,6 +482,7 @@ function DossierCard({ dossier, responsibles, approvedStudents, waitingStudents,
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function ValidationPage() {
+  const { responsible } = useAuth()
   const { dossiers, responsibles, loading: dossiersLoading, error: dossiersError, refresh, upsertStatus, resetStatus } = useDossiers()
   const { loading: syncLoading, error: syncError, result: syncResult, lastSyncAt, sync } = useSyncHelloasso()
   const { approvedStudents } = useApprovedStudents()
@@ -495,6 +569,10 @@ export default function ValidationPage() {
 
       {/* Stats sur tous les dossiers */}
       {!dossiersLoading && !dossiersError && <StatsBar dossiers={dossiers} />}
+
+      {!dossiersLoading && !dossiersError && responsible?.is_superuser && (
+        <StatsByResponsible dossiers={dossiers} responsibles={responsibles} />
+      )}
 
       {dossiersError && (
         <p className="font-mono text-sm text-red-600 bg-red-50 border-l-4 border-red-400 px-4 py-3">

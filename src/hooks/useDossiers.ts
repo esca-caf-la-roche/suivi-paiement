@@ -105,6 +105,7 @@ export function useDossiers(): UseDossiersReturn {
           id:                 d.id,
           helloasso_link_id:  d.helloasso_link_id,
           link_url:           link.url,
+          responsible_id:     link.responsible_id || null,
           is_installment:     link.is_installment,
           payer_first_name:   d.payer_first_name,
           payer_last_name:    d.payer_last_name,
