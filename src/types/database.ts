@@ -20,8 +20,9 @@ export type PaymentStatusEnum =
 
 /** Table : responsibles (1:1 avec auth.users) */
 export interface Responsible {
-  id:   string   // uuid = auth.users.id
-  name: string   // "Patrick C" ou "Stéphane M"
+  id:           string   // uuid = auth.users.id
+  name:         string   // "Patrick C" ou "Stéphane M"
+  is_superuser: boolean
 }
 
 /**

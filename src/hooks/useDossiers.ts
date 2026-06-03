@@ -21,7 +21,7 @@ export interface UseDossiersReturn {
 }
 
 export function useDossiers(): UseDossiersReturn {
-  const { user } = useAuth()
+  const { user, responsible } = useAuth()
 
   const [dossiers,     setDossiers]     = useState<Dossier[]>([])
   const [responsibles, setResponsibles] = useState<Responsible[]>([])
@@ -76,7 +76,9 @@ export function useDossiers(): UseDossiersReturn {
         if (!link) continue
 
         // RLS : Si le lien a un responsable assigné, et que ce n'est pas l'utilisateur connecté, on ignore
-        if (link.responsible_id && link.responsible_id !== user?.id) continue
+        // Exception pour le super-utilisateur (is_superuser) qui doit tout voir
+        const isSuperUser = !!responsible?.is_superuser
+        if (!isSuperUser && link.responsible_id && link.responsible_id !== user?.id) continue
 
         const groupIds = linkToGroups.get(link.id) ?? []
         const dossierGroups = groups.filter(g => groupIds.includes(g.id))
@@ -133,7 +135,7 @@ export function useDossiers(): UseDossiersReturn {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, responsible])
 
   useEffect(() => { load() }, [load])
 
