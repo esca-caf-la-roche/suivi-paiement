@@ -509,15 +509,16 @@ export default function ValidationPage() {
   // Par défaut : uniquement les dossiers vierges (pas encore traités)
   const [filterStatus, setFilterStatus] = useState('À traiter')
   const [filterType,   setFilterType]   = useState('')
-  const [filterGroup,  setFilterGroup]  = useState('')
+  const [filterResponsible, setFilterResponsible] = useState('')
+  const [hasInitializedResponsible, setHasInitializedResponsible] = useState(false)
 
-  const allGroups = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const d of dossiers) {
-      for (const g of d.groups) map.set(g.id, g.name)
+  useEffect(() => {
+    if (responsible?.id && !hasInitializedResponsible) {
+      setFilterResponsible(responsible.id)
+      setHasInitializedResponsible(true)
     }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [dossiers])
+  }, [responsible, hasInitializedResponsible])
+
 
   // Stats calculées sur TOUS les dossiers (pas sur filtrés)
   const filtered = useMemo(() => {
@@ -538,10 +539,17 @@ export default function ValidationPage() {
       }
       if (filterType === '1x' && d.is_installment)  return false
       if (filterType === '3x' && !d.is_installment) return false
-      if (filterGroup && !d.groups.some(g => g.id === filterGroup)) return false
+      if (filterResponsible) {
+        if (filterResponsible === 'none') {
+          if (d.responsible_id !== null) return false
+        } else if (d.responsible_id !== filterResponsible) {
+          return false
+        }
+      }
       return true
     })
-  }, [dossiers, search, filterStatus, filterType, filterGroup])
+  }, [dossiers, search, filterStatus, filterType, filterResponsible])
+
 
   async function handleSyncAndRefresh(force = false) {
     await sync(force)
@@ -621,17 +629,18 @@ export default function ValidationPage() {
           <option value="3x">3× only</option>
         </select>
 
-        {allGroups.length > 0 && (
-          <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-            className="border-2 border-noir px-2 py-1.5 text-sm font-mono bg-blanc focus:outline-none">
-            <option value="">Tous groupes</option>
-            {allGroups.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        )}
+        <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+          className="border-2 border-noir px-2 py-1.5 text-sm font-mono bg-blanc focus:outline-none">
+          <option value="">Tous les responsables</option>
+          {responsibles.map(r => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+          <option value="none">Sans responsable</option>
+        </select>
 
-        {(search || filterType || filterGroup || filterStatus !== 'À traiter') && (
+        {(search || filterType || filterResponsible || filterStatus !== 'À traiter') && (
           <button
-            onClick={() => { setSearch(''); setFilterStatus('À traiter'); setFilterType(''); setFilterGroup('') }}
+            onClick={() => { setSearch(''); setFilterStatus('À traiter'); setFilterType(''); setFilterResponsible('') }}
             className="text-xs font-mono text-noir/50 underline hover:text-noir"
           >
             ↺ Reset

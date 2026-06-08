@@ -75,10 +75,8 @@ export function useDossiers(): UseDossiersReturn {
         const link = linksMap.get(d.helloasso_link_id)
         if (!link) continue
 
-        // RLS : Si le lien a un responsable assigné, et que ce n'est pas l'utilisateur connecté, on ignore
-        // Exception pour le super-utilisateur (is_superuser) qui doit tout voir
-        const isSuperUser = !!responsible?.is_superuser
-        if (!isSuperUser && link.responsible_id && link.responsible_id !== user?.id) continue
+        // Tous les utilisateurs peuvent voir et intervenir sur tous les dossiers.
+
 
         const groupIds = linkToGroups.get(link.id) ?? []
         const dossierGroups = groups.filter(g => groupIds.includes(g.id))
