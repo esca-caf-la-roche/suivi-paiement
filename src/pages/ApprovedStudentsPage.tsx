@@ -3,6 +3,10 @@ import { useApprovedStudents } from '../hooks/useApprovedStudents'
 import { useGroups } from '../hooks/useGroups'
 import { useDossiers } from '../hooks/useDossiers'
 
+function normalise(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+}
+
 export default function ApprovedStudentsPage() {
   const { approvedStudents, loading: studentsLoading, error: studentsError, addApprovedStudent, updateApprovedStudent, deleteApprovedStudent } = useApprovedStudents()
   const { groups, loading: groupsLoading, error: groupsError } = useGroups()
@@ -44,8 +48,8 @@ export default function ApprovedStudentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !groupId) {
-      setSubmitError('Veuillez remplir tous les champs.')
+    if (!firstName.trim() || !lastName.trim() || !groupId) {
+      setSubmitError('Veuillez remplir le prénom, le nom et le groupe.')
       return
     }
 
@@ -88,8 +92,8 @@ export default function ApprovedStudentsPage() {
   }
 
   async function handleSaveEdit(id: string) {
-    if (!editFirstName.trim() || !editLastName.trim() || !editEmail.trim() || !editGroupId) {
-      alert('Veuillez remplir tous les champs.')
+    if (!editFirstName.trim() || !editLastName.trim() || !editGroupId) {
+      alert('Veuillez remplir le prénom, le nom et le groupe.')
       return
     }
 
@@ -185,11 +189,10 @@ export default function ApprovedStudentsPage() {
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-wider text-noir/60 mb-1">
-                    Adresse mail
+                    Adresse mail (optionnelle)
                   </label>
                   <input
                     type="email"
-                    required
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="Ex: jean.dupont@mail.com"
@@ -270,9 +273,17 @@ export default function ApprovedStudentsPage() {
                         if (dossier.local_status !== 'Traité') return false
                         const matchesGroup = dossier.groups.some(g => g.id === student.group_id)
                         if (!matchesGroup) return false
-                        const studentEmail = student.email.toLowerCase()
-                        return dossier.payer_email.toLowerCase() === studentEmail || 
-                          (dossier.email && dossier.email.toLowerCase() === studentEmail)
+                        
+                        if (student.email) {
+                          const studentEmail = student.email.toLowerCase()
+                          if (dossier.payer_email.toLowerCase() === studentEmail || 
+                            (dossier.email && dossier.email.toLowerCase() === studentEmail)) {
+                            return true
+                          }
+                        }
+                        
+                        return normalise(student.first_name) === normalise(dossier.first_name) &&
+                               normalise(student.last_name) === normalise(dossier.last_name)
                       })
 
                       const isEditing = editingStudentId === student.id

@@ -230,22 +230,37 @@ function DossierCard({ dossier, responsibles, approvedStudents, waitingStudents,
   const isApproved = useMemo(() => {
     if (!hasApprovalGroup) return false
     return approvalGroups.every(g => {
-      return approvedStudents.some(s => 
-        s.group_id === g.id && 
-        (s.email.toLowerCase() === dossier.payer_email.toLowerCase() || 
-         (dossier.email && s.email.toLowerCase() === dossier.email.toLowerCase()))
-      )
+      return approvedStudents.some(s => {
+        if (s.group_id !== g.id) return false
+        if (s.email) {
+          const studentEmail = s.email.toLowerCase()
+          if (studentEmail === dossier.payer_email.toLowerCase() || 
+              (dossier.email && studentEmail === dossier.email.toLowerCase())) {
+            return true
+          }
+        }
+        return normalise(s.first_name).trim() === normalise(dossier.first_name).trim() &&
+               normalise(s.last_name).trim() === normalise(dossier.last_name).trim()
+      })
     })
-  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
+  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email, dossier.first_name, dossier.last_name])
 
   const matchingApprovedStudents = useMemo(() => {
     if (!hasApprovalGroup) return []
-    return approvedStudents.filter(s =>
-      approvalGroups.some(g => g.id === s.group_id) &&
-      (s.email.toLowerCase() === dossier.payer_email.toLowerCase() ||
-       (dossier.email && s.email.toLowerCase() === dossier.email.toLowerCase()))
-    )
-  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email])
+    return approvedStudents.filter(s => {
+      const isGroupMatch = approvalGroups.some(g => g.id === s.group_id)
+      if (!isGroupMatch) return false
+      if (s.email) {
+        const studentEmail = s.email.toLowerCase()
+        if (studentEmail === dossier.payer_email.toLowerCase() ||
+            (dossier.email && studentEmail === dossier.email.toLowerCase())) {
+          return true
+        }
+      }
+      return normalise(s.first_name).trim() === normalise(dossier.first_name).trim() &&
+             normalise(s.last_name).trim() === normalise(dossier.last_name).trim()
+    })
+  }, [approvalGroups, hasApprovalGroup, approvedStudents, dossier.payer_email, dossier.email, dossier.first_name, dossier.last_name])
 
   const matchingWaitingStudents = useMemo(() => {
     const emailsToMatch = new Set([
